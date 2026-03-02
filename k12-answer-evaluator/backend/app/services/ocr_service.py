@@ -116,23 +116,28 @@ class OCRService:
             logger.info(f"Best OCR method: {method} (conf={best_conf:.2f}, len={len(best_text)})")
                 
             # Post-process text with image context for true AI vision correction
-            processed_text = self._post_process_text(best_text, image_path)
+            processed_text = str(self._post_process_text(best_text, image_path))
             logger.info(f"Post-processed to {len(processed_text)} characters")
-            logger.debug(f"Text preview: {processed_text[:200]}...")
+            logger.debug(f"Text preview: {processed_text[:200]}...")  # pyre-ignore
             
             # Detect question regions from text
             question_regions = self.region_detector.detect_question_regions(image_path, processed_text)
             
             # Extract diagrams with question mapping
-            diagram_metadata = self.diagram_service.extract_diagrams(
-                image_path, 
-                question_regions=question_regions
-            ) if self.diagram_service else {}
+            diagram_metadata = {}
+            if self.diagram_service:
+                diagram_metadata = self.diagram_service.extract_diagrams( # pyre-ignore
+                    image_path, 
+                    question_regions=question_regions
+                )
             
             if diagram_metadata.get("has_diagrams"):
-                logger.info(f"Detected {len(diagram_metadata.get('shapes_detected', []))} geometric shapes")
-                if diagram_metadata.get("question_diagrams"):
-                    logger.info(f"Mapped diagrams to {len(diagram_metadata['question_diagrams'])} questions")
+                shapes = diagram_metadata.get('shapes_detected', [])
+                num_shapes = len(shapes) if shapes is not None else 0 # pyre-ignore
+                logger.info(f"Detected {num_shapes} geometric shapes")
+                q_diagrams = diagram_metadata.get("question_diagrams")
+                if q_diagrams is not None:
+                    logger.info(f"Mapped diagrams to {len(q_diagrams)} questions") # pyre-ignore
             
             return processed_text.strip(), diagram_metadata
             
@@ -399,12 +404,12 @@ class OCRService:
                 current_sentence = line
             # If line ends with punctuation, it's end of sentence
             elif line.endswith(('.', '!', '?', ':')):
-                current_sentence += ' ' + line if current_sentence else line
+                current_sentence = current_sentence + ' ' + line if current_sentence else line
                 processed_lines.append(current_sentence)
                 current_sentence = ''
             # Otherwise, continue sentence
             else:
-                current_sentence += ' ' + line if current_sentence else line
+                current_sentence = current_sentence + ' ' + line if current_sentence else line
         
         if current_sentence:
             processed_lines.append(current_sentence)

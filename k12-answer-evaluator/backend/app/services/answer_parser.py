@@ -69,7 +69,7 @@ class AnswerParser:
             if not has_explicit_marker and current_q != -1:
                 if q_num in seen_qs:
                     is_bullet = True
-                elif q_num < current_q and (current_q - q_num) > 3:
+                elif int(q_num) < int(current_q) and (int(current_q) - int(q_num)) > 3:
                     is_bullet = True
 
             if is_bullet:
@@ -102,15 +102,15 @@ class AnswerParser:
                         curr -= 1
                         
                     if stacked_empties:
-                        restarts = list(re.finditer(r'(?m)^\s*(?:Q\s*)?1[\.\)]\s+', answers[q]))
+                        restarts = list(re.finditer(r'(?m)^\s*(?:Q\s*)?1[\.\)]\s+', str(answers[q]))) # pyre-ignore
                         # Ensure we have exactly enough "1." restarts to fill the empty questions plus the current one
                         if len(restarts) > 1 and len(restarts) == len(stacked_empties) + 1:
                             chunks = []
                             last_idx = 0
                             for r in restarts[1:]:
-                                chunks.append(answers[q][last_idx:r.start()].strip())
+                                chunks.append(str(answers[q])[last_idx:r.start()].strip()) # pyre-ignore
                                 last_idx = r.start()
-                            chunks.append(answers[q][last_idx:].strip())
+                            chunks.append(str(answers[q])[last_idx:].strip()) # pyre-ignore
                             
                             targets = stacked_empties + [q]
                             for target, chunk in zip(targets, chunks):

@@ -5,7 +5,7 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 from app.core.database import get_db
 from app.core.security import verify_password, create_access_token, decode_access_token
-from app.schemas.user import UserCreate, UserLogin, Token, User as UserSchema, UpdateProfile
+from app.schemas.user import UserCreate, UserLogin, ParentLogin, Token, User as UserSchema, UpdateProfile
 from app.crud import user as crud_user
 from app.models.user import User
 from datetime import timedelta
@@ -33,6 +33,23 @@ def login(request: Request, user_login: UserLogin, db: Session = Depends(get_db)
         )
     
     access_token = create_access_token(data={"sub": str(user.id), "role": user.role})
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": user
+    }
+
+@router.post("/parent-login", response_model=Token)
+@_limiter.limit("10/minute")
+def parent_login(request: Request, data: ParentLogin, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.parent_access_code == data.parent_code).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid parent access code"
+        )
+    
+    access_token = create_access_token(data={"sub": str(user.id), "role": "parent"})
     return {
         "access_token": access_token,
         "token_type": "bearer",

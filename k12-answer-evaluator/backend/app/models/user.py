@@ -19,6 +19,7 @@ class User(Base):
     full_name = Column(String, nullable=False)
     role = Column(Enum(UserRole, values_callable=lambda x: [e.value for e in x]), nullable=False)
     grade = Column(String(20), nullable=True)          # e.g. "Grade 8", "Grade 10"
+    parent_access_code = Column(String(10), unique=True, index=True, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     

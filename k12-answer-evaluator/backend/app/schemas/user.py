@@ -9,6 +9,7 @@ class UserBase(BaseModel):
     full_name: str
     role: UserRole
     grade: Optional[str] = None
+    parent_access_code: Optional[str] = None
 
 class UserCreate(UserBase):
     password: str
@@ -16,6 +17,9 @@ class UserCreate(UserBase):
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
+
+class ParentLogin(BaseModel):
+    parent_code: str
 
 class User(UserBase):
     id: UUID

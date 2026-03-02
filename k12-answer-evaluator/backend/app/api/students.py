@@ -655,3 +655,23 @@ def get_my_progress(
         "timeline": timeline,
         "subject_stats": subject_stats,
     }
+
+@router.post("/parent-code")
+def generate_parent_code(db: Session = Depends(get_db), student: User = Depends(get_student)):
+    """Generate or regenerate a 6-character parent access code."""
+    import secrets
+    import string
+    while True:
+        code = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(6))
+        if not db.query(User).filter(User.parent_access_code == code).first():
+            break
+            
+    student.parent_access_code = code
+    db.commit()
+    db.refresh(student)
+    return {"parent_access_code": student.parent_access_code}
+
+@router.get("/parent-code")
+def get_parent_code(student: User = Depends(get_student)):
+    """Get the current parent access code."""
+    return {"parent_access_code": student.parent_access_code}
