@@ -7,13 +7,14 @@ from app.models.question import Question
 from typing import List
 from uuid import UUID
 
-def create_submission(db: Session, paper_id: UUID, student_id: UUID, image_path: str, uploaded_files: list = None) -> AnswerSubmission:
+def create_submission(db: Session, paper_id: UUID, student_id: UUID, image_path: str, uploaded_files: list = None, is_practice: bool = False) -> AnswerSubmission:
     db_submission = AnswerSubmission(
         paper_id=paper_id,
         student_id=student_id,
         image_path=image_path,
         uploaded_files=uploaded_files,
-        status=SubmissionStatus.PENDING
+        status=SubmissionStatus.PENDING,
+        is_practice=is_practice
     )
     db.add(db_submission)
     db.commit()
@@ -78,6 +79,7 @@ def get_paper_submissions(db: Session, paper_id: UUID) -> List:
             "total_marks": total_marks,
             "max_marks": max_marks,
             "evaluations": evaluations_data,
+            "is_practice": submission.is_practice,
         })
     
     return result
@@ -131,7 +133,8 @@ def get_submission_details(db: Session, submission_id: UUID, student_id: UUID) -
         "status": submission.status.value,
         "total_marks": total_marks,
         "max_marks": max_marks,
-        "evaluations": evaluations_data
+        "evaluations": evaluations_data,
+        "is_practice": submission.is_practice
     }
 
 def get_student_submissions(db: Session, student_id: UUID) -> List:
@@ -168,7 +171,8 @@ def get_student_submissions(db: Session, student_id: UUID) -> List:
             "status": submission.status.value,
             "total_marks": total_marks,
             "max_marks": max_marks,
-            "evaluations": evaluations_data
+            "evaluations": evaluations_data,
+            "is_practice": submission.is_practice
         })
     
     return result

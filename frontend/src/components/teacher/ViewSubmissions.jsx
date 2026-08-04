@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import Navbar from '../common/Navbar';
-import api from '../../services/api';
+import api, { getStudents, teacherSubmitAnswer } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 import {
   MdChevronLeft, MdPerson, MdMailOutline, MdEvent, MdCheckCircle,
@@ -124,7 +124,7 @@ function OverrideModal({ evaluation, onClose, onSaved }) {
 }
 
 // ── Submission Row ─────────────────────────────────────────────────────────────
-function SubmissionRow({ sub, paperId }) {
+function SubmissionRow({ sub, _paperId }) {
   const [open, setOpen] = useState(false);
   const [overrideTarget, setOverrideTarget] = useState(null);
   const [evals, setEvals] = useState(sub.evaluations || []);
@@ -158,8 +158,17 @@ function SubmissionRow({ sub, paperId }) {
               <MdPerson size={24} />
             </div>
             <div>
-              <p className="font-bold text-slate-900 dark:text-slate-100">{sub.student_name}</p>
-              <div className="flex items-center gap-1 text-[10px] text-slate-400 font-medium">
+              <div className="flex items-center gap-2">
+                <p className="font-bold text-slate-900 dark:text-slate-100">{sub.student_name}</p>
+                <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest border ${
+                  sub.is_practice 
+                    ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-blue-100 dark:border-blue-800' 
+                    : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-800'
+                }`}>
+                  {sub.is_practice ? 'Practice' : 'Official'}
+                </span>
+              </div>
+              <div className="flex items-center gap-1 text-[10px] text-slate-400 font-medium mt-0.5">
                 <MdMailOutline size={12} /> {sub.student_email}
               </div>
             </div>
@@ -256,6 +265,185 @@ function SubmissionRow({ sub, paperId }) {
   );
 }
 
+// ── Upload Student Answer Sheet Modal ──────────────────────────────────────────
+function UploadAnswerModal({ paperId, onClose, onUploaded }) {
+  const [students, setStudents] = useState([]);
+  const [selectedStudentId, setSelectedStudentId] = useState('');
+  const [files, setFiles] = useState([]);
+  const [previews, setPreviews] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [loadingStudents, setLoadingStudents] = useState(true);
+  const toast = useToast();
+
+  useEffect(() => {
+    const fetchStudents = async () => {
+      try {
+        const res = await getStudents();
+        setStudents(res.data);
+        if (res.data.length > 0) {
+          setSelectedStudentId(res.data[0].id);
+        }
+      } catch (_err) {
+        toast.error('Failed to load students list');
+      } finally {
+        setLoadingStudents(false);
+      }
+    };
+    fetchStudents();
+  }, []);
+
+  const handleFileChange = (e) => {
+    const selectedFiles = Array.from(e.target.files);
+    if (selectedFiles.length > 0) {
+      setFiles(prev => [...prev, ...selectedFiles]);
+
+      const newPreviews = [...previews];
+      let loadedCount = 0;
+      selectedFiles.forEach((file) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          newPreviews.push(reader.result);
+          loadedCount++;
+          if (loadedCount === selectedFiles.length) {
+            setPreviews(newPreviews);
+          }
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+    e.target.value = '';
+  };
+
+  const removeFile = (index) => {
+    setFiles(prev => prev.filter((_, i) => i !== index));
+    setPreviews(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedStudentId) {
+      toast.error('Please select a student');
+      return;
+    }
+    if (files.length === 0) {
+      toast.error('Please select at least one answer sheet image');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await teacherSubmitAnswer(paperId, selectedStudentId, files);
+      toast.success('Official student answer sheet uploaded successfully!');
+      onUploaded();
+      onClose();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Upload failed');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4 animate-in fade-in duration-300">
+      <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-xl p-8 border border-slate-200 dark:border-slate-700 scale-enter max-h-[90vh] overflow-y-auto custom-scrollbar flex flex-col">
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <MdPendingActions className="text-indigo-500" /> Upload Student Answer Sheet
+          </h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors">
+            <MdClose size={24} />
+          </button>
+        </div>
+
+        {loadingStudents ? (
+          <div className="flex flex-col items-center justify-center py-8 gap-3 text-slate-400">
+            <BiLoaderAlt size={32} className="animate-spin text-indigo-500" />
+            <p className="text-xs font-bold uppercase tracking-wider">Loading student list...</p>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div>
+              <label className="text-sm font-bold text-slate-700 dark:text-slate-300 block mb-2 ml-1">
+                Select Student
+              </label>
+              <select
+                value={selectedStudentId}
+                onChange={e => setSelectedStudentId(e.target.value)}
+                className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none dark:text-slate-100 transition-all"
+              >
+                {students.map(std => (
+                  <option key={std.id} value={std.id}>
+                    {std.name} ({std.email}) {std.grade ? `- ${std.grade}` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-sm font-bold text-slate-700 dark:text-slate-300 block mb-2 ml-1">
+                Official Answer Sheets (Images)
+              </label>
+              <div className="border-4 border-dashed border-slate-100 dark:border-slate-700 rounded-3xl p-8 text-center hover:border-indigo-200 dark:hover:border-indigo-900 transition-colors relative">
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleFileChange}
+                  className="absolute inset-0 opacity-0 cursor-pointer"
+                />
+                <p className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                  Drag & drop files here, or <span className="text-indigo-600 font-bold">browse</span>
+                </p>
+                <p className="text-xs text-slate-400 mt-1">JPG or PNG only</p>
+              </div>
+            </div>
+
+            {previews.length > 0 && (
+              <div className="space-y-3 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Selected Pages ({previews.length})</p>
+                <div className="grid grid-cols-2 gap-4">
+                  {previews.map((preview, index) => (
+                    <div key={index} className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-700 relative">
+                      <img src={preview} alt="preview" className="w-12 h-12 object-cover rounded-lg" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">Page {index + 1}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeFile(index)}
+                        className="text-slate-400 hover:text-red-500 p-1"
+                      >
+                        <MdClose size={16} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-4 pt-4 border-t border-slate-100 dark:border-slate-700">
+              <button
+                type="submit"
+                disabled={submitting || files.length === 0}
+                className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white py-4 rounded-2xl font-bold shadow-lg shadow-indigo-100 dark:shadow-none transition-all flex items-center justify-center gap-2"
+              >
+                {submitting ? <BiLoaderAlt className="animate-spin" size={24} /> : 'Upload & Evaluate'}
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-6 py-4 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 font-bold text-sm rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-all"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Main Component ─────────────────────────────────────────────────────────────
 export default function ViewSubmissions() {
   const { paperId } = useParams();
@@ -264,6 +452,18 @@ export default function ViewSubmissions() {
   const [paper, setPaper] = useState(null);
   const [submissions, setSubmissions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [filterType, setFilterType] = useState('all');
+
+  const loadSubmissions = () => {
+    Promise.all([
+      api.get(`/teacher/papers/${paperId}`),
+      api.get(`/teacher/papers/${paperId}/submissions`),
+    ]).then(([paperRes, subsRes]) => {
+      setPaper(paperRes.data);
+      setSubmissions(subsRes.data);
+    }).catch(() => toast.error('Failed to load submissions'));
+  };
 
   useEffect(() => {
     Promise.all([
@@ -274,7 +474,7 @@ export default function ViewSubmissions() {
       setSubmissions(subsRes.data);
     }).catch(() => toast.error('Failed to load submissions'))
       .finally(() => setLoading(false));
-  }, [paperId]);
+  }, [paperId, toast]);
 
   if (loading) return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors">
@@ -290,6 +490,12 @@ export default function ViewSubmissions() {
   const avgScore = evaluated.length > 0
     ? (evaluated.reduce((s, sub) => s + sub.total_marks, 0) / evaluated.length).toFixed(1)
     : null;
+
+  const filteredSubmissions = submissions.filter(sub => {
+    if (filterType === 'official') return !sub.is_practice;
+    if (filterType === 'practice') return sub.is_practice;
+    return true;
+  });
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors">
@@ -315,7 +521,13 @@ export default function ViewSubmissions() {
               </span>
             </div>
           </div>
-          <div className="flex gap-4">
+          <div className="flex flex-wrap gap-4">
+            <button
+              onClick={() => setShowUploadModal(true)}
+              className="inline-flex items-center gap-2 px-6 py-3.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800/50 rounded-2xl hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-all font-bold text-sm shadow-sm"
+            >
+              <MdPendingActions size={20} /> Upload Student Sheet
+            </button>
             <Link
               to={`/teacher/papers/${paperId}/assign`}
               className="inline-flex items-center gap-2 px-6 py-3.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-all font-bold text-sm shadow-sm"
@@ -365,18 +577,34 @@ export default function ViewSubmissions() {
         </div>
 
         {/* Submissions Table Section */}
-        <div className="flex items-center justify-between mb-6 px-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 px-4">
           <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Submission History</h2>
-          <button className="flex items-center gap-2 text-xs font-black text-slate-400 uppercase tracking-widest hover:text-indigo-600 transition-colors">
-            <MdFilterList size={18} /> Filter Listings
-          </button>
+          <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-900 p-1 rounded-2xl border border-slate-200/50 dark:border-slate-800">
+            {[
+              { key: 'all', label: 'All Submissions' },
+              { key: 'official', label: 'Official' },
+              { key: 'practice', label: 'Practice' }
+            ].map(f => (
+              <button
+                key={f.key}
+                onClick={() => setFilterType(f.key)}
+                className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
+                  filterType === f.key
+                    ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                    : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border border-slate-200 dark:border-slate-700 rounded-[2.5rem] shadow-2xl dark:shadow-none overflow-hidden">
-          {submissions.length === 0 ? (
+          {filteredSubmissions.length === 0 ? (
             <div className="text-center py-24 flex flex-col items-center opacity-30">
               <MdPendingActions size={80} />
-              <p className="text-2xl font-black mt-4">Waiting for initial submissions...</p>
+              <p className="text-2xl font-black mt-4">No submissions match the filter...</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -391,7 +619,7 @@ export default function ViewSubmissions() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                  {submissions.map(sub => (
+                  {filteredSubmissions.map(sub => (
                     <SubmissionRow key={sub.id} sub={sub} paperId={paperId} />
                   ))}
                 </tbody>
@@ -400,6 +628,14 @@ export default function ViewSubmissions() {
           )}
         </div>
       </div>
+
+      {showUploadModal && (
+        <UploadAnswerModal
+          paperId={paperId}
+          onClose={() => setShowUploadModal(false)}
+          onUploaded={loadSubmissions}
+        />
+      )}
     </div>
   );
 }

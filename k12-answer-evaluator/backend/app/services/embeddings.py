@@ -4,14 +4,14 @@ import re
 import logging
 from typing import List, Optional
 from functools import lru_cache
-from app.config import get_settings
+from app.config import settings
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class EmbeddingService:
     def __init__(self, model_name: Optional[str] = None):
-        self.settings = get_settings()
+        self.settings = settings
         self.model_name = model_name or self.settings.embedding_model
         self.device = self._get_device()
         self.model = self._load_model()

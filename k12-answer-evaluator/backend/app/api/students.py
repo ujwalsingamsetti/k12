@@ -94,7 +94,7 @@ async def submit_answer(
     all_paths_json = json.dumps(file_paths)
     
     # Create submission and immediately mark as evaluating
-    submission = crud_submission.create_submission(db, paper_id, student.id, file_paths[0], uploaded_files=file_paths)
+    submission = crud_submission.create_submission(db, paper_id, student.id, file_paths[0], uploaded_files=file_paths, is_practice=True)
     crud_submission.update_submission_status(db, submission.id, SubmissionStatus.EVALUATING)
     db.refresh(submission)
     

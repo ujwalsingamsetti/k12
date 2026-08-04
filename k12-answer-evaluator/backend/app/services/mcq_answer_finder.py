@@ -1,6 +1,8 @@
+import os
 import logging
 from typing import Dict, Optional
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from app.services.rag_service import RAGService
 
 logger = logging.getLogger(__name__)
@@ -10,7 +12,9 @@ class MCQAnswerFinder:
     
     def __init__(self):
         self.rag_service = RAGService()
-        self.model = genai.GenerativeModel('gemini-flash-latest')
+        api_key = os.environ.get("GEMINI_API_KEY")
+        self.client = genai.Client(api_key=api_key)
+        self.model_name = 'gemini-2.5-flash'
     
     def find_correct_answer(
         self,
@@ -61,12 +65,13 @@ Return ONLY the letter (A, B, C, or D) of the correct answer. No explanation nee
 Answer:"""
             
             # Get LLM response
-            response = self.model.generate_content(
-                prompt,
-                generation_config=genai.types.GenerationConfig(
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=prompt,
+                config=types.GenerateContentConfig(
                     temperature=0.1,  # Low temperature for factual answers
                     max_output_tokens=10,
-                )
+                ),
             )
             
             # Extract answer letter

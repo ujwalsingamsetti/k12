@@ -83,12 +83,11 @@ function GradeDonut({ distribution }) {
     if (!distribution?.length) return null;
     const total = distribution.reduce((s, d) => s + d.count, 0);
     if (!total) return null;
-    let cum = 0;
-    const segments = distribution.filter(d => d.count > 0).map(d => {
+    const activeDist = distribution.filter(d => d.count > 0);
+    const segments = activeDist.map((d, idx) => {
         const pct = (d.count / total) * 100;
-        const seg = { grade: d.grade, count: d.count, pct, start: cum, color: GRADE_COLORS[d.grade] || '#94a3b8' };
-        cum += pct;
-        return seg;
+        const start = activeDist.slice(0, idx).reduce((s, prev) => s + (prev.count / total) * 100, 0);
+        return { grade: d.grade, count: d.count, pct, start, color: GRADE_COLORS[d.grade] || '#94a3b8' };
     });
     const gradient = segments.map(s => `${s.color} ${s.start}% ${s.start + s.pct}%`).join(', ');
 

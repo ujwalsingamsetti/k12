@@ -214,12 +214,14 @@ async def upload_textbook(
         str(textbook.id), file_path,
         subject or "general",
         class_level or "",
-        str(teacher.id), db
+        str(teacher.id)
     )
     
     return {"id": str(textbook.id), "title": textbook.title, "message": "Textbook uploaded, processing..."}
 
-def ingest_textbook_task(textbook_id: str, file_path: str, subject: str, class_level: str, teacher_id: str, db: Session):
+def ingest_textbook_task(textbook_id: str, file_path: str, subject: str, class_level: str, teacher_id: str):
+    from app.core.database import SessionLocal
+    db = SessionLocal()
     try:
         service = TextbookIngestionService()
         chunk_count = service.ingest_textbook(file_path, subject, textbook_id, teacher_id, class_level=class_level)
@@ -231,6 +233,8 @@ def ingest_textbook_task(textbook_id: str, file_path: str, subject: str, class_l
             db.commit()
     except Exception as e:
         print(f"Textbook ingestion failed: {e}")
+    finally:
+        db.close()
 
 @router.get("/textbooks")
 def get_my_textbooks(
@@ -270,9 +274,10 @@ def delete_textbook(
 @router.post("/papers/from-image")
 async def create_paper_from_image(
     files: List[UploadFile] = File(...),
-    title: str = None,
-    subject: str = None,
-    duration_minutes: int = 180,
+    title: str = Form(None),
+    subject: str = Form(None),
+    class_level: str = Form("12"),
+    duration_minutes: int = Form(180),
     db: Session = Depends(get_db),
     teacher: User = Depends(get_teacher)
 ):
@@ -329,7 +334,7 @@ async def create_paper_from_image(
         paper_data = QuestionPaperCreate(
             title=title or f"Paper from {files[0].filename}",
             subject=subject or "science",
-            class_level="12",
+            class_level=class_level or "12",
             total_marks=total_marks,
             duration_minutes=duration_minutes,
             questions=questions
@@ -368,6 +373,65 @@ async def create_paper_from_image(
                     os.remove(file_path)
                 except:
                     pass
+
+
+@router.post("/papers/{paper_id}/submit-for-student/{student_id}")
+async def submit_for_student(
+    paper_id: str,
+    student_id: str,
+    files: List[UploadFile] = File(...),
+    background_tasks: BackgroundTasks = BackgroundTasks(),
+    db: Session = Depends(get_db),
+    teacher: User = Depends(get_teacher)
+):
+    """Allow teacher to upload an answer sheet for a student."""
+    from app.models.submission import SubmissionStatus
+    from app.api.students import process_submission_multiple
+    
+    # 1. Verify student exists
+    student = db.query(User).filter(User.id == student_id, User.role == UserRole.STUDENT).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+        
+    # 2. Verify paper exists and belongs to the teacher
+    paper = crud_paper.get_paper(db, paper_id)
+    if not paper or paper.teacher_id != teacher.id:
+        raise HTTPException(status_code=404, detail="Question paper not found")
+        
+    # 3. Save uploaded files
+    file_paths = []
+    date_folder = datetime.now().strftime("%Y-%m-%d")
+    upload_dir = os.path.join(settings.UPLOAD_DIR, date_folder)
+    os.makedirs(upload_dir, exist_ok=True)
+    
+    for idx, file in enumerate(files):
+        file_ext = os.path.splitext(file.filename)[1]
+        file_id = str(uuid.uuid4())
+        file_path = os.path.join(upload_dir, f"{file_id}_page{idx+1}{file_ext}")
+        
+        with open(file_path, "wb") as f:
+            content = await file.read()
+            f.write(content)
+        
+        file_paths.append(file_path)
+        
+    # 4. Create submission record (is_practice = False for official teacher uploads)
+    submission = crud_submission.create_submission(
+        db, paper_id, student.id, file_paths[0],
+        uploaded_files=file_paths, is_practice=False
+    )
+    crud_submission.update_submission_status(db, submission.id, SubmissionStatus.EVALUATING)
+    db.refresh(submission)
+    
+    # 5. Run evaluation background task
+    background_tasks.add_task(process_submission_multiple, submission.id, file_paths, paper_id)
+    
+    return {
+        "id": str(submission.id),
+        "status": submission.status,
+        "submitted_at": submission.submitted_at.isoformat(),
+        "is_practice": submission.is_practice
+    }
 
 
 # ═══════════════════════════════════════════════════════════════

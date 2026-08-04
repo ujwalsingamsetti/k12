@@ -137,6 +137,11 @@ export default function Login() {
               Join for free
             </Link>
           </p>
+          <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700 text-center">
+            <Link to="/parent/login" className="text-sm font-medium text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+              Are you a parent? Click here.
+            </Link>
+          </div>
         </div>
 
         <p className="text-center text-xs text-slate-400 dark:text-slate-500 mt-8 font-medium">

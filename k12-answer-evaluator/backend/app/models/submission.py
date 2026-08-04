@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, Text, ForeignKey, Enum, JSON
+from sqlalchemy import Column, String, DateTime, Text, ForeignKey, Enum, JSON, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -24,6 +24,7 @@ class AnswerSubmission(Base):
     diagram_metadata = Column(JSON, nullable=True)
     submitted_at = Column(DateTime, default=datetime.utcnow)
     status = Column(Enum(SubmissionStatus, values_callable=lambda x: [e.value for e in x]), default=SubmissionStatus.PENDING)
+    is_practice = Column(Boolean, default=False)
     
     paper = relationship("QuestionPaper", back_populates="submissions")
     evaluations = relationship("Evaluation", back_populates="submission", cascade="all, delete-orphan")

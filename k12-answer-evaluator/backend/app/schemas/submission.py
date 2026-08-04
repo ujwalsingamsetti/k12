@@ -28,6 +28,7 @@ class Submission(BaseModel):
     total_marks: Optional[float] = None
     max_marks: Optional[int] = None
     evaluations: List[EvaluationResult] = []
+    is_practice: bool = False
     
     class Config:
         from_attributes = True
@@ -40,6 +41,7 @@ class SubmissionList(BaseModel):
     status: str
     total_marks: Optional[float] = None
     max_marks: Optional[int] = None
+    is_practice: bool = False
     
     class Config:
         from_attributes = True

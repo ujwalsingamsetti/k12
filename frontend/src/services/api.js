@@ -27,7 +27,7 @@ export const updateProfile = (data) => api.patch('/auth/profile', data);
 // Teacher
 export const createPaper = (data) => api.post('/teacher/papers', data);
 export const updatePaper = (id, data) => api.put(`/teacher/papers/${id}`, data);
-export const createPaperFromImage = (files, title, subject, duration) => {
+export const createPaperFromImage = (files, title, subject, class_level, duration) => {
   const formData = new FormData();
   if (Array.isArray(files)) {
     files.forEach((file) => formData.append('files', file));
@@ -36,8 +36,21 @@ export const createPaperFromImage = (files, title, subject, duration) => {
   }
   if (title) formData.append('title', title);
   if (subject) formData.append('subject', subject);
+  if (class_level) formData.append('class_level', class_level);
   if (duration) formData.append('duration_minutes', duration);
   return api.post('/teacher/papers/from-image', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+};
+export const getStudents = () => api.get('/teacher/students');
+export const teacherSubmitAnswer = (paperId, studentId, files) => {
+  const formData = new FormData();
+  if (Array.isArray(files)) {
+    files.forEach((file) => formData.append('files', file));
+  } else {
+    formData.append('files', files);
+  }
+  return api.post(`/teacher/papers/${paperId}/submit-for-student/${studentId}`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
 };
@@ -95,5 +108,14 @@ export const getSubmissionDetails = (id) => api.get(`/student/submissions/${id}`
 export const getSubmissionImage = (submissionId, page = 1) => {
   return `${API_URL}/student/submissions/${submissionId}/image?page=${page}`;
 };
+
+// --- Parent Portal Endpoints ---
+export const parentLogin = (data) => api.post('/auth/parent-login', data);
+export const generateParentCode = () => api.post('/student/parent-code');
+export const getParentCode = () => api.get('/student/parent-code');
+export const getParentStudentInfo = () => api.get('/parent/student-info');
+export const getParentProgress = () => api.get('/parent/progress');
+export const getParentSubmissions = () => api.get('/parent/submissions');
+export const getParentSubmissionDetails = (id) => api.get(`/parent/submissions/${id}`);
 
 export default api;

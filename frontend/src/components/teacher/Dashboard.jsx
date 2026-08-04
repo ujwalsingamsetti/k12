@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { getMyPapers, deletePaper, getMyTextbooks, uploadTextbook, deleteTextbook } from '../../services/api';
 import Navbar from '../common/Navbar';
 import { useToast } from '../../context/ToastContext';
@@ -283,7 +283,6 @@ export default function TeacherDashboard() {
   const [activeTab, setActiveTab] = useState('papers');
   const [showUpload, setShowUpload] = useState(false);
   const toast = useToast();
-  const navigate = useNavigate();
 
   useEffect(() => { loadPapers(); loadTextbooks(); }, []);
 

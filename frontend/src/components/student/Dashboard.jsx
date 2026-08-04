@@ -64,13 +64,19 @@ const STATUS = {
 
 // ── Paper Card ────────────────────────────────────────────────────────────────
 function PaperCard({ paper, existingSubId }) {
-  const [examStatus, setExamStatus] = useState(null);
+  const [examStatus, setExamStatus] = useState(() => {
+    if (!paper.is_exam_mode) {
+      return { mode: 'practice', can_submit: true };
+    }
+    return null;
+  });
   const colorClass = colorClassFor(paper.subject);
 
   useEffect(() => {
-    if (!paper.is_exam_mode) { setExamStatus({ mode: 'practice', can_submit: true }); return; }
-    api.get(`/student/papers/${paper.id}/exam-status`).then(r => setExamStatus(r.data)).catch(() => { });
-  }, [paper.id]);
+    if (paper.is_exam_mode) {
+      api.get(`/student/papers/${paper.id}/exam-status`).then(r => setExamStatus(r.data)).catch(() => { });
+    }
+  }, [paper.id, paper.is_exam_mode]);
 
   const canSubmit = examStatus?.can_submit !== false && !existingSubId;
 
@@ -260,7 +266,16 @@ function SubmissionRow({ sub }) {
         </div>
         <div className="min-w-0">
           <p className="font-extrabold text-slate-900 dark:text-slate-100 truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{sub.paper_title || 'Answer Sheet'}</p>
-          <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 mt-1 uppercase tracking-widest">{toIST(sub.submitted_at)}</p>
+          <div className="flex items-center gap-2 mt-1">
+            <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">{toIST(sub.submitted_at)}</p>
+            <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest border ${
+              sub.is_practice 
+                ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-blue-100 dark:border-blue-800' 
+                : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-800'
+            }`}>
+              {sub.is_practice ? 'Practice' : 'Official'}
+            </span>
+          </div>
         </div>
       </div>
       <div className="text-right shrink-0 ml-4">

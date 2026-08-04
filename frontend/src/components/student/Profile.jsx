@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import Navbar from '../common/Navbar';
-import { MdPerson, MdSchool, MdSave, MdArrowBack } from 'react-icons/md';
+import { MdPerson, MdSchool, MdSave, MdArrowBack, MdKey, MdContentCopy } from 'react-icons/md';
+import { generateParentCode, getParentCode } from '../../services/api';
 
 const GRADES = [
     'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4',
@@ -13,7 +14,7 @@ const GRADES = [
 
 export default function Profile() {
     const { user, updateProfileApi } = useAuth();
-    const { showToast } = useToast();
+    const toast = useToast();
     const navigate = useNavigate();
 
     const [loading, setLoading] = useState(false);
@@ -21,6 +22,8 @@ export default function Profile() {
         full_name: '',
         grade: ''
     });
+    const [parentCode, setParentCode] = useState(null);
+    const [codeLoading, setCodeLoading] = useState(false);
 
     useEffect(() => {
         if (user) {
@@ -28,8 +31,33 @@ export default function Profile() {
                 full_name: user.full_name || '',
                 grade: user.grade || ''
             });
+            if (user.role === 'student') {
+                getParentCode().then(res => {
+                    setParentCode(res.data.parent_access_code);
+                }).catch(() => { });
+            }
         }
     }, [user]);
+
+    const handleGenerateCode = async () => {
+        setCodeLoading(true);
+        try {
+            const res = await generateParentCode();
+            setParentCode(res.data.parent_access_code);
+            toast.success('Parent access code generated successfully!');
+        } catch (_err) {
+            toast.error('Failed to generate code');
+        } finally {
+            setCodeLoading(false);
+        }
+    };
+
+    const copyToClipboard = () => {
+        if (parentCode) {
+            navigator.clipboard.writeText(parentCode);
+            toast.success('Code copied to clipboard!');
+        }
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -39,11 +67,11 @@ export default function Profile() {
                 full_name: formData.full_name,
                 grade: formData.grade || null
             });
-            showToast('Profile updated successfully!', 'success');
+            toast.success('Profile updated successfully!');
             // Go back to dashboard based on role
             navigate(user?.role === 'teacher' ? '/teacher' : '/student');
         } catch (err) {
-            showToast(err.response?.data?.detail || 'Failed to update profile', 'error');
+            toast.error(err.response?.data?.detail || 'Failed to update profile');
         } finally {
             setLoading(false);
         }
@@ -126,6 +154,48 @@ export default function Profile() {
                         </div>
                     </form>
                 </div>
+
+                {user?.role === 'student' && (
+                    <div className="mt-8 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-[2.5rem] p-10 shadow-xl dark:shadow-none">
+                        <div className="flex items-center gap-4 mb-6">
+                            <div className="w-12 h-12 rounded-xl bg-purple-50 dark:bg-purple-900/30 flex items-center justify-center border border-purple-100 dark:border-purple-800">
+                                <MdKey size={24} className="text-purple-600 dark:text-purple-400" />
+                            </div>
+                            <div>
+                                <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Parent Portal Access</h2>
+                                <p className="text-sm text-slate-500 dark:text-slate-400">Generate a code for your parents to view your progress.</p>
+                            </div>
+                        </div>
+
+                        <div className="bg-slate-50 dark:bg-slate-900 rounded-2xl p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                            <div className="flex-1 w-full">
+                                {parentCode ? (
+                                    <div className="flex items-center gap-3">
+                                        <div className="text-3xl font-mono font-black tracking-widest text-indigo-600 dark:text-indigo-400">
+                                            {parentCode}
+                                        </div>
+                                        <button
+                                            onClick={copyToClipboard}
+                                            className="p-2 rounded-lg bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-200 transition-colors"
+                                            title="Copy to clipboard"
+                                        >
+                                            <MdContentCopy size={20} />
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <p className="text-slate-500 dark:text-slate-400 italic">No access code generated yet.</p>
+                                )}
+                            </div>
+                            <button
+                                onClick={handleGenerateCode}
+                                disabled={codeLoading}
+                                className="whitespace-nowrap px-6 py-3 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 font-bold rounded-xl transition-colors disabled:opacity-50"
+                            >
+                                {codeLoading ? 'Generating...' : parentCode ? 'Regenerate Code' : 'Generate Code'}
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

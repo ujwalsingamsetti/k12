@@ -93,7 +93,7 @@ export default function ViewResults() {
   useEffect(() => {
     let pollInterval = null;
 
-    const fetchSubmission = async (isInitial = false) => {
+    const fetchSubmission = async () => {
       try {
         const res = await getSubmissionDetails(submissionId);
         const data = res.data;
@@ -103,14 +103,14 @@ export default function ViewResults() {
         if (!isProcessing(data.status)) {
           if (pollInterval) clearInterval(pollInterval);
         }
-      } catch (error) {
+      } catch (_error) {
         if (pollInterval) clearInterval(pollInterval);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchSubmission(true);
+    fetchSubmission();
     pollInterval = setInterval(() => fetchSubmission(), 5000);
 
     return () => {
@@ -186,6 +186,13 @@ export default function ViewResults() {
               </span>
               <span className="flex items-center gap-1.5 bg-white dark:bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
                 <MdAccessTime size={16} /> {submittedTime} IST
+              </span>
+              <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border font-black uppercase text-[10px] tracking-widest shadow-sm ${
+                submission.is_practice 
+                  ? 'bg-blue-50/80 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-blue-100 dark:border-blue-800' 
+                  : 'bg-emerald-50/80 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-800'
+              }`}>
+                {submission.is_practice ? 'Practice / Sample' : 'Official Evaluation'}
               </span>
             </div>
           </div>

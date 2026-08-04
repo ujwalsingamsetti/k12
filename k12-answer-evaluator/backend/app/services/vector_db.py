@@ -11,7 +11,7 @@ from qdrant_client.models import (
 from typing import List, Dict, Optional
 import logging
 from time import sleep
-from app.config import get_settings
+from app.config import settings
 from app.services.textbook_processor import TextbookChunk
 
 logging.basicConfig(level=logging.INFO)
@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 class VectorDBService:
     def __init__(self):
-        self.settings = get_settings()
+        self.settings = settings
         self.collection_name = self.settings.qdrant_collection_name
         self.client = self._initialize_client()
     

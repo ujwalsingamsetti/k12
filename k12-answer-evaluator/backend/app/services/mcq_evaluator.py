@@ -36,7 +36,7 @@ def extract_correct_answer(correct_answer) -> str:
     if val in ['A', 'B', 'C', 'D']:
         return val
     # Extract letter if stored as something like "(B)" or "Option C"
-    match = re.search(r'([A-D])', val)
+    match = re.search(r'\b([A-D])\b', val)
     return match.group(1) if match else val
 
 def evaluate_mcq(question, student_answer: str) -> dict:

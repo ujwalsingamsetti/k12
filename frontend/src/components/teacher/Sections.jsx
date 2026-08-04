@@ -273,8 +273,8 @@ export default function Sections() {
 
                 {/* Manage Members Side Panel */}
                 {activeSection && (
-                    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-end z-[60]">
-                        <div className="bg-white dark:bg-slate-800 w-full max-w-md h-full shadow-2xl flex flex-col page-enter">
+                    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-end z-[60]" style={{ height: '100vh', minHeight: '100vh' }}>
+                        <div className="bg-white dark:bg-slate-800 w-full max-w-md shadow-2xl flex flex-col" style={{ height: '100vh', overflowY: 'hidden' }}>
                             <div className="p-8 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center">
                                 <div>
                                     <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">{activeSection.name}</h2>

@@ -7,6 +7,7 @@ import ProtectedRoute from './components/common/ProtectedRoute';
 // Auth
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
+import ParentLogin from './components/auth/ParentLogin';
 
 // Teacher
 import TeacherDashboard from './components/teacher/Dashboard';
@@ -23,6 +24,10 @@ import SubmitAnswer from './components/student/SubmitAnswer';
 import ViewResults from './components/student/ViewResults';
 import Profile from './components/student/Profile';
 
+// Parent
+import ParentDashboard from './components/parent/Dashboard';
+import ParentViewResults from './components/parent/ViewResults';
+
 // Shared
 import Leaderboard from './components/common/Leaderboard';
 
@@ -35,6 +40,7 @@ function App() {
             <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/parent/login" element={<ParentLogin />} />
 
               {/* Teacher Routes */}
               <Route
@@ -124,6 +130,24 @@ function App() {
                 element={
                   <ProtectedRoute role="student">
                     <ViewResults />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Parent Routes */}
+              <Route
+                path="/parent/dashboard"
+                element={
+                  <ProtectedRoute role="parent">
+                    <ParentDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/parent/submissions/:submissionId"
+                element={
+                  <ProtectedRoute role="parent">
+                    <ParentViewResults />
                   </ProtectedRoute>
                 }
               />

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createPaper, extractQuestionsFromImage } from '../../services/api';
+import { createPaper, createPaperFromImage } from '../../services/api';
 import Navbar from '../common/Navbar';
 import { useToast } from '../../context/ToastContext';
 import {
@@ -93,7 +93,7 @@ export default function CreatePaper() {
       await createPaper(payload);
       toast.success('Question paper created successfully!');
       navigate('/teacher');
-    } catch (error) {
+    } catch (_error) {
       toast.error('Failed to create paper. Please check all fields.');
     } finally {
       setLoading(false);
@@ -106,11 +106,17 @@ export default function CreatePaper() {
 
     setUploading(true);
     try {
-      const res = await extractQuestionsFromImage(files);
-      setQuestions(res.data.questions);
-      setMode('manual');
-      toast.success(`OCR Successful! Extracted ${res.data.questions_count} questions.`);
-    } catch (error) {
+      const titleVal = formData.title || `Paper from ${files[0].name}`;
+      const res = await createPaperFromImage(
+        files,
+        titleVal,
+        formData.subject,
+        formData.class_level,
+        formData.duration_minutes
+      );
+      toast.success(`OCR Successful! Created paper "${res.data.title}" with ${res.data.questions_count} questions.`);
+      navigate('/teacher');
+    } catch (_error) {
       toast.error('Failed to process file(s). Ensure text is clear.');
     } finally {
       setUploading(false);
@@ -162,7 +168,7 @@ export default function CreatePaper() {
 
         {mode === 'image' ? (
           <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border border-slate-200 dark:border-slate-700 rounded-3xl p-10 shadow-2xl dark:shadow-none animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="grid md:grid-cols-3 gap-6 mb-10">
+            <div className="grid md:grid-cols-4 gap-6 mb-10">
               <div className="md:col-span-2">
                 <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2.5 ml-1 flex items-center gap-2">
                   <MdOutlineDescription className="text-indigo-500" /> Paper Title
@@ -199,6 +205,18 @@ export default function CreatePaper() {
                   <option value="general">Other / General</option>
                 </select>
               </div>
+              <div>
+                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2.5 ml-1 flex items-center gap-2">
+                  <MdSchool className="text-indigo-500" /> Class Level
+                </label>
+                <select
+                  value={formData.class_level}
+                  onChange={(e) => setFormData({ ...formData, class_level: e.target.value })}
+                  className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-bold appearance-none cursor-pointer"
+                >
+                  {[8, 9, 10, 11, 12].map(g => <option key={g} value={String(g)}>Grade {g}</option>)}
+                </select>
+              </div>
             </div>
 
             <div className="border-4 border-dashed border-slate-100 dark:border-slate-700 rounded-3xl p-16 text-center flex flex-col items-center group hover:border-indigo-200 dark:hover:border-indigo-900 transition-colors">
@@ -232,7 +250,7 @@ export default function CreatePaper() {
                     </label>
                     <button
                       type="button"
-                      onClick={(e) => handleImageUpload({ target: { files: uploadFiles, value: '' } })}
+                      onClick={() => handleImageUpload({ target: { files: uploadFiles, value: '' } })}
                       disabled={uploading}
                       className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-4 rounded-2xl font-bold shadow-lg shadow-indigo-100 dark:shadow-none transition-all flex items-center justify-center gap-2"
                     >

@@ -56,7 +56,7 @@ export default function EditPaper() {
       if (paper.questions && paper.questions.length > 0) {
         setQuestions(paper.questions);
       }
-    } catch (error) {
+    } catch (_error) {
       toast.error('Failed to load paper details.');
       navigate('/teacher');
     } finally {
@@ -124,7 +124,7 @@ export default function EditPaper() {
       await updatePaper(paperId, payload);
       toast.success('Question paper updated successfully!');
       navigate('/teacher');
-    } catch (error) {
+    } catch (_error) {
       toast.error('Failed to update paper. Please check all fields.');
     } finally {
       setLoading(false);

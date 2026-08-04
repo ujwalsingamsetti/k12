@@ -28,7 +28,7 @@ export default function SubmitAnswer() {
     try {
       const res = await getPaperDetails(paperId);
       setPaper(res.data);
-    } catch (error) {
+    } catch (_error) {
       toast.error('Failed to load paper details');
     } finally {
       setLoading(false);
@@ -97,7 +97,7 @@ export default function SubmitAnswer() {
       await submitAnswer(paperId, files);
       toast.success('Your answer sheet has been submitted for evaluation!');
       navigate('/student');
-    } catch (error) {
+    } catch (_error) {
       toast.error('Submission failed. Please try again.');
     } finally {
       setSubmitting(false);
@@ -188,8 +188,8 @@ export default function SubmitAnswer() {
           <div className="lg:col-span-3">
             <form onSubmit={handleSubmit} className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border border-slate-200 dark:border-slate-700 rounded-3xl p-8 shadow-2xl dark:shadow-none space-y-8">
               <div>
-                <h2 className="text-2xl font-black text-slate-900 dark:text-slate-100 mb-2">Submit Answer Sheet</h2>
-                <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Capture or upload your written answers. Multiple pages supported.</p>
+                <h2 className="text-2xl font-black text-slate-900 dark:text-slate-100 mb-2">Submit Practice/Sample Answer Sheet</h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Capture or upload your practice/sample written answers. Multiple pages supported.</p>
               </div>
 
               <div className="border-4 border-dashed border-slate-100 dark:border-slate-700 rounded-3xl p-12 text-center group hover:border-indigo-200 dark:hover:border-indigo-900 transition-colors">
@@ -261,7 +261,7 @@ export default function SubmitAnswer() {
                 >
                   {submitting ? <BiLoaderAlt className="animate-spin" size={28} /> : (
                     <>
-                      <span>Submit Answer Sheet</span>
+                      <span>Submit Practice/Sample Answer Sheet</span>
                       <MdCheckCircle size={24} />
                     </>
                   )}

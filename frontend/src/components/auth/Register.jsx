@@ -30,7 +30,7 @@ export default function Register() {
       await register(dataToSubmit);
       toast.success('Account created! Please sign in.');
       navigate('/login');
-    } catch (error) {
+    } catch (_error) {
       toast.error('Registration failed. Email might already be taken.');
     } finally {
       setLoading(false);

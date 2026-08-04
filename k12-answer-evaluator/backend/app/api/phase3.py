@@ -343,7 +343,7 @@ def _build_pdf(student, paper, sub, evals, total, max_m, pct):
             import json as _json
             try:
                 fb = _json.loads(ev.feedback)
-                feedback_raw = fb.get("feedback", "")
+                feedback_raw = fb.get("overall_feedback", fb.get("feedback", ""))
             except Exception:
                 feedback_raw = str(ev.feedback)[:120]
 
