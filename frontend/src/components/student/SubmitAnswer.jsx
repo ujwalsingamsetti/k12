@@ -1,12 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getPaperDetails, submitAnswer } from '../../services/api';
 import Navbar from '../common/Navbar';
 import { useToast } from '../../context/ToastContext';
 import {
-  MdChevronLeft, MdOutlineDescription, MdAccessTime, MdInfoOutline,
-  MdCloudUpload, MdImage, MdDelete, MdArrowUpward, MdArrowDownward,
-  MdCheckCircle, MdOutlineSchool, MdPictureAsPdf
+  MdChevronLeft, MdOutlineDescription, MdAccessTime,
+  MdCloudUpload, MdDelete, MdArrowUpward, MdArrowDownward,
+  MdCheckCircle, MdPictureAsPdf
 } from 'react-icons/md';
 import { BiLoaderAlt } from 'react-icons/bi';
 
@@ -20,11 +20,7 @@ export default function SubmitAnswer() {
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadPaper();
-  }, [paperId]);
-
-  const loadPaper = async () => {
+  const loadPaper = useCallback(async () => {
     try {
       const res = await getPaperDetails(paperId);
       setPaper(res.data);
@@ -33,7 +29,11 @@ export default function SubmitAnswer() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [paperId, toast]);
+
+  useEffect(() => {
+    loadPaper();
+  }, [loadPaper]);
 
   const handleFileChange = (e) => {
     const selectedFiles = Array.from(e.target.files);
@@ -147,7 +147,7 @@ export default function SubmitAnswer() {
 
           {paper.pdf_path && (
             <a
-              href={`http://localhost:8000/api/student/papers/${paperId}/pdf`}
+              href={`/api/student/papers/${paperId}/pdf`}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3.5 rounded-2xl font-bold text-sm shadow-xl shadow-indigo-100 dark:shadow-none transition-all transform active:scale-95"

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getParentStudentInfo, getParentProgress, getParentSubmissions } from '../../services/api';
 import Navbar from '../common/Navbar';
+import { useToast } from '../../context/ToastContext';
 import {
     MdHistory, MdTrendingUp, MdTrendingDown,
     MdCheckCircle, MdHourglassBottom, MdInfoOutline,
@@ -150,13 +151,14 @@ export default function ParentDashboard() {
     const [submissions, setSubmissions] = useState([]);
     const [progress, setProgress] = useState(null);
     const [loading, setLoading] = useState(true);
+    const toast = useToast();
 
     useEffect(() => {
         Promise.all([getParentStudentInfo(), getParentSubmissions(), getParentProgress()])
             .then(([info, s, pr]) => { setStudentInfo(info.data); setSubmissions(s.data); setProgress(pr.data); })
-            .catch(console.error)
+            .catch(() => toast.error('Failed to load student records'))
             .finally(() => setLoading(false));
-    }, []);
+    }, [toast]);
 
     const evaluatedCount = submissions.filter(s => s.status === 'evaluated').length;
 

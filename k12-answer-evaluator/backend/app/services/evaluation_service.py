@@ -22,9 +22,63 @@ class EvaluationService:
             raise ValueError("GEMINI_API_KEY not found in .env file. Get free key from https://aistudio.google.com/app/apikey")
         
         self.client = genai.Client(api_key=api_key)
-        self.model_name = 'gemini-2.5-pro'
+        # Default to Gemini 1.5 Flash for lowest latency, minimal cost, and high throughput
+        self.model_name = os.environ.get("GEMINI_MODEL", "gemini-1.5-flash")
         logger.info(f"✅ Initialized GenAI client with {self.model_name}")
     
+    async def evaluate_answer_async(
+        self,
+        question: str,
+        student_answer: str,
+        textbook_context: str,
+        subject: str,
+        class_level: str = "12",
+        max_score: int = 10,
+        diagram_info: dict = None,
+        marking_scheme: dict = None,
+        rag_scores: List[float] = None,
+        system_type: str = "general",
+        academic_level: str = None
+    ) -> Dict:
+        """Asynchronously evaluate student answer using Gemini API (non-blocking)"""
+        effective_level = academic_level or class_level
+        logger.info(f"[Async] Evaluating {subject} Q (max: {max_score} marks, model: {self.model_name}, level: {effective_level})")
+        
+        try:
+            sys_instruction = self._create_system_instruction(
+                subject=subject,
+                max_score=max_score,
+                system_type=system_type,
+                academic_level=effective_level,
+                class_level=class_level
+            )
+            user_prompt = self._create_user_prompt(
+                question=question,
+                student_answer=student_answer,
+                textbook_context=textbook_context,
+                marking_scheme=marking_scheme
+            )
+            
+            response = await self.client.aio.models.generate_content(
+                model=self.model_name,
+                contents=user_prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=sys_instruction,
+                    response_mime_type="application/json",
+                    temperature=0.2,
+                    max_output_tokens=1024,
+                ),
+            )
+            raw_response = response.text
+            evaluation = self._parse_response(raw_response, max_score)
+            return self._finalize_evaluation(
+                evaluation, student_answer, rag_scores, marking_scheme,
+                max_score, system_type, effective_level
+            )
+        except Exception as e:
+            logger.error(f"❌ Gemini async evaluation failed: {e}")
+            return self._create_fallback_evaluation(max_score, str(e))
+
     def evaluate_answer(
         self,
         question: str,
@@ -45,72 +99,88 @@ class EvaluationService:
         logger.info(f"Evaluating {subject} Q (max: {max_score} marks, system: {system_type}, level: {effective_level})")
         
         try:
-            prompt = self._create_prompt(
+            sys_instruction = self._create_system_instruction(
+                subject=subject,
+                max_score=max_score,
+                system_type=system_type,
+                academic_level=effective_level,
+                class_level=class_level
+            )
+            user_prompt = self._create_user_prompt(
                 question=question,
                 student_answer=student_answer,
                 textbook_context=textbook_context,
-                subject=subject,
-                max_score=max_score,
-                class_level=class_level,
-                marking_scheme=marking_scheme,
-                system_type=system_type,
-                academic_level=effective_level
+                marking_scheme=marking_scheme
             )
             response = self.client.models.generate_content(
                 model=self.model_name,
-                contents=prompt,
+                contents=user_prompt,
                 config=types.GenerateContentConfig(
+                    system_instruction=sys_instruction,
                     response_mime_type="application/json",
                     temperature=0.2,
+                    max_output_tokens=1024,
                 ),
             )
             raw_response = response.text
             evaluation = self._parse_response(raw_response, max_score)
-            
-            # Calculate confidence
-            confidence = self._calculate_confidence(
-                evaluation, student_answer, rag_scores or [], marking_scheme
+            return self._finalize_evaluation(
+                evaluation, student_answer, rag_scores, marking_scheme,
+                max_score, system_type, effective_level
             )
-            
-            # Apply confidence-based leniency overrides
-            original_score = float(evaluation.get("score", 0))
-            if confidence > 0.65:
-                evaluation["score"] = max_score
-                logger.info(f"Confidence {confidence:.2f} > 0.65: Boosted score from {original_score} to {max_score}")
-            elif confidence > 0.50:
-                boosted_score = max(0, max_score - 1)
-                evaluation["score"] = max(original_score, boosted_score)
-                logger.info(f"Confidence {confidence:.2f} > 0.50: Boosted score from {original_score} to {evaluation['score']}")
-            elif confidence > 0.30:
-                boosted_score = max_score / 2.0
-                evaluation["score"] = max(original_score, boosted_score)
-                logger.info(f"Confidence {confidence:.2f} > 0.30: Boosted score from {original_score} to {evaluation['score']}")
-            elif confidence > 0.20:
-                boosted_score = max(0, (max_score / 2.0) - 1.0) # Gives less than half mark
-                evaluation["score"] = max(original_score, boosted_score)
-                logger.info(f"Confidence {confidence:.2f} > 0.20: Boosted score from {original_score} to {evaluation['score']}")
-            
-            evaluation["confidence"] = confidence
-            evaluation["metadata"] = {
-                "model": self.model_name,
-                "provider": "google",
-                "confidence": confidence,
-                "system_type": system_type,
-                "academic_level": effective_level
-            }
-            
-            logger.info(f"✅ Score: {evaluation['score']}/{max_score}, Confidence: {confidence:.2f}")
-            return evaluation
-            
         except Exception as e:
             logger.error(f"❌ Gemini evaluation failed: {e}")
             return self._create_fallback_evaluation(max_score, str(e))
-    
-    def _create_prompt(self, question, student_answer, textbook_context, 
-                      subject, max_score, class_level, marking_scheme,
-                      system_type="general", academic_level=None):
-        """Create evaluation prompt adaptable to any education system, university, or examination board"""
+
+    def _finalize_evaluation(
+        self,
+        evaluation: Dict,
+        student_answer: str,
+        rag_scores: List[float],
+        marking_scheme: dict,
+        max_score: int,
+        system_type: str,
+        effective_level: str
+    ) -> Dict:
+        """Apply confidence calculation, leniency boost, and metadata packaging"""
+        confidence = self._calculate_confidence(
+            evaluation, student_answer, rag_scores or [], marking_scheme
+        )
         
+        # Apply confidence-based leniency overrides
+        original_score = float(evaluation.get("score", 0))
+        if confidence > 0.65:
+            evaluation["score"] = max_score
+            logger.info(f"Confidence {confidence:.2f} > 0.65: Boosted score from {original_score} to {max_score}")
+        elif confidence > 0.50:
+            boosted_score = max(0, max_score - 1)
+            evaluation["score"] = max(original_score, boosted_score)
+            logger.info(f"Confidence {confidence:.2f} > 0.50: Boosted score from {original_score} to {evaluation['score']}")
+        elif confidence > 0.30:
+            boosted_score = max_score / 2.0
+            evaluation["score"] = max(original_score, boosted_score)
+            logger.info(f"Confidence {confidence:.2f} > 0.30: Boosted score from {original_score} to {evaluation['score']}")
+        elif confidence > 0.20:
+            boosted_score = max(0, (max_score / 2.0) - 1.0)
+            evaluation["score"] = max(original_score, boosted_score)
+            logger.info(f"Confidence {confidence:.2f} > 0.20: Boosted score from {original_score} to {evaluation['score']}")
+        
+        evaluation["confidence"] = confidence
+        evaluation["metadata"] = {
+            "model": self.model_name,
+            "provider": "google",
+            "confidence": confidence,
+            "system_type": system_type,
+            "academic_level": effective_level
+        }
+        
+        logger.info(f"✅ Score: {evaluation['score']}/{max_score}, Confidence: {confidence:.2f}")
+        return evaluation
+    
+    def _create_system_instruction(self, subject: str, max_score: int, 
+                                  system_type: str = "general", academic_level: str = None, 
+                                  class_level: str = "12") -> str:
+        """Create structured system instruction for Gemini prompt prefix caching"""
         correctness = round(max_score * 0.5, 1)
         completeness = round(max_score * 0.3, 1)
         understanding = round(max_score - correctness - completeness, 1)
@@ -119,18 +189,17 @@ class EvaluationService:
         system_lower = str(system_type or "general").lower()
         system_display = str(system_type or "General Academic").strip().title()
         
-        # Adaptive persona and grading philosophy
         if any(keyword in system_lower for keyword in ["university", "college", "higher_ed", "engineering", "undergraduate", "postgraduate"]):
             evaluator_role = f"an expert University Professor and Examiner in {subject} (Academic Level: {level_str})"
             grading_guidance = (
-                "Evaluate the student's response with university-level academic rigor. "
-                "Verify conceptual accuracy, technical precision, correct mathematical derivations/steps, "
-                "and valid professional terminology. Award fair partial credit for correct working steps."
+                "Evaluate with university-level academic rigor. Verify conceptual accuracy, "
+                "technical precision, mathematical derivations/steps, and professional terminology. "
+                "Award fair partial credit for correct working steps."
             )
         elif any(keyword in system_lower for keyword in ["competitive", "gate", "gre", "upsc", "certification", "professional"]):
             evaluator_role = f"a rigorous Senior Evaluator for competitive and professional examination standards in {subject}"
             grading_guidance = (
-                "Evaluate with high precision. Check for analytical correctness, concise justifications, "
+                "Evaluate with high precision. Check analytical correctness, concise justifications, "
                 "proper formulas, and absence of flawed assumptions."
             )
         elif any(keyword in system_lower for keyword in ["cbse", "icse", "state_board", "cambridge", "ib", "k12", "school"]):
@@ -142,35 +211,15 @@ class EvaluationService:
         else:
             evaluator_role = f"an experienced and fair Academic Examiner in {subject} (Level: {level_str})"
             grading_guidance = (
-                "Evaluate the student's answer fairly and constructively against the reference material and marking criteria. "
-                "Reward valid points and provide clear, actionable feedback for any gaps."
+                "Evaluate fairly and constructively against the reference material and marking criteria. "
+                "Reward valid points and provide clear, actionable feedback."
             )
 
-        marking_text = ""
-        if marking_scheme:
-            marking_text = "\n\nOFFICIAL MARKING SCHEME / RUBRIC:\n"
-            for item in marking_scheme.get("breakdown", []):
-                marking_text += f"- {item['point']} ({item['marks']} mark)\n"
-            if "keywords" in marking_scheme:
-                marking_text += f"\nRequired Technical Keywords: {', '.join(marking_scheme['keywords'])}\n"
-        
         return f"""You are {evaluator_role}.
-        
-Evaluation Philosophy:
-{grading_guidance}
+Guidance: {grading_guidance}
 
-QUESTION:
-{question}
-{marking_text}
-
-CURRICULUM REFERENCE / REFERENCE MATERIAL:
-{textbook_context}
-
-STUDENT SUBMITTED ANSWER:
-{student_answer}
-
-Evaluate the student's response and return ONLY valid JSON matching this schema:
-
+Evaluate the student answer against the reference material and marking scheme.
+Output ONLY valid JSON matching this schema:
 {{
   "score": <number between 0 and {max_score}>,
   "score_breakdown": {{
@@ -178,27 +227,66 @@ Evaluate the student's response and return ONLY valid JSON matching this schema:
     "completeness": <0 to {completeness}>,
     "understanding": <0 to {understanding}>
   }},
-  "correct_points": ["Specific points or steps the student solved or explained correctly"],
+  "correct_points": ["Specific correct points or steps demonstrated"],
   "errors": [
     {{
-      "what": "Concise statement of the error or misconception",
-      "why": "Technical or conceptual explanation of why it is incorrect",
+      "what": "Concise mistake or misconception statement",
+      "why": "Conceptual explanation of why it is incorrect",
       "impact": "Mark reduction impact"
     }}
   ],
-  "missing_concepts": ["Key concepts, formulas, or steps that should have been included"],
-  "correct_answer_should_include": ["Core expectations for a full-mark model answer"],
+  "missing_concepts": ["Missing formulas, steps, or concepts"],
+  "correct_answer_should_include": ["Core expectations for full-mark answer"],
   "improvement_guidance": [
     {{
-      "suggestion": "Clear, actionable recommendation for improvement",
-      "resource": "Specific topic, chapter, or reference area to revise",
-      "practice": "Targeted problem type or exercise to practice"
+      "suggestion": "Actionable recommendation",
+      "resource": "Specific topic or chapter to revise",
+      "practice": "Targeted problem type to practice"
     }}
   ],
   "overall_feedback": "Constructive, objective summary of performance."
 }}
+Return ONLY valid JSON without markdown code fences or conversational prose."""
 
-Return ONLY the JSON, no markdown code fence, no additional prose."""
+    def _create_user_prompt(self, question: str, student_answer: str, textbook_context: str, 
+                            marking_scheme: dict = None) -> str:
+        """Create concise user prompt payload for minimal latency and token consumption"""
+        marking_text = ""
+        if marking_scheme:
+            breakdown = marking_scheme.get("breakdown", [])
+            if breakdown:
+                items = [f"- {item.get('point', '')} ({item.get('marks', '')} mark)" for item in breakdown]
+                marking_text += "\n\nOFFICIAL MARKING SCHEME / RUBRIC:\n" + "\n".join(items)
+            if "keywords" in marking_scheme and marking_scheme["keywords"]:
+                marking_text += f"\nRequired Technical Keywords: {', '.join(marking_scheme['keywords'])}"
+
+        parts = [f"QUESTION:\n{question.strip()}"]
+        if marking_text:
+            parts.append(marking_text.strip())
+        if textbook_context and textbook_context.strip():
+            parts.append(f"CURRICULUM REFERENCE / REFERENCE MATERIAL:\n{textbook_context.strip()}")
+        parts.append(f"STUDENT SUBMITTED ANSWER:\n{student_answer.strip() if student_answer else '(No response submitted)'}")
+
+        return "\n\n".join(parts)
+
+    def _create_prompt(self, question, student_answer, textbook_context, 
+                      subject, max_score, class_level, marking_scheme,
+                      system_type="general", academic_level=None):
+        """Backward-compatible combined prompt generator"""
+        sys_inst = self._create_system_instruction(
+            subject=subject,
+            max_score=max_score,
+            system_type=system_type,
+            academic_level=academic_level,
+            class_level=class_level
+        )
+        user_p = self._create_user_prompt(
+            question=question,
+            student_answer=student_answer,
+            textbook_context=textbook_context,
+            marking_scheme=marking_scheme
+        )
+        return f"{sys_inst}\n\n{user_p}"
     
     def _parse_response(self, text: str, max_score: int) -> Dict:
         """Parse Gemini response"""
@@ -271,3 +359,16 @@ Return ONLY the JSON, no markdown code fence, no additional prose."""
             "confidence": 0.3,
             "metadata": {"error": True, "error_message": error}
         }
+
+
+# Global singleton instance
+_evaluation_service_instance = None
+
+
+def get_evaluation_service() -> EvaluationService:
+    """Thread-safe lazy singleton for EvaluationService to avoid duplicate GenAI client instantiations"""
+    global _evaluation_service_instance
+    if _evaluation_service_instance is None:
+        _evaluation_service_instance = EvaluationService()
+    return _evaluation_service_instance
+

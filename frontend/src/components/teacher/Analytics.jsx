@@ -2,16 +2,13 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Navbar from '../common/Navbar';
 import { useToast } from '../../context/ToastContext';
-import api from '../../services/api';
+import { getPaperAnalytics } from '../../services/api';
 
 import {
     MdPeople as PeopleIcon, MdTrendingUp as TrendingIcon, MdEmojiEvents as AwardIcon,
     MdCheckCircle as CheckIcon, MdArrowBack as BackIcon, MdFileDownload as DownloadIcon,
     MdInsertChart as ChartIcon, MdLayers as TableIcon, MdSentimentVeryDissatisfied as SadIcon,
-    MdInfo as InfoIcon, MdStar as StarIcon,
-    MdCheckCircleOutline, MdChevronLeft, MdDownload, MdBarChart, MdTableChart,
-    MdSentimentDissatisfied, MdOutlineAnalytics, MdInfoOutline,
-    MdStars, MdFiberManualRecord
+    MdStar as StarIcon, MdFiberManualRecord
 } from 'react-icons/md';
 import { BiLoaderAlt } from 'react-icons/bi';
 import { FiAlertTriangle, FiTarget } from 'react-icons/fi';
@@ -154,11 +151,11 @@ export default function Analytics() {
     const [exporting, setExporting] = useState(false);
 
     useEffect(() => {
-        api.get(`/teacher/papers/${paperId}/analytics`)
+        getPaperAnalytics(paperId)
             .then(r => setData(r.data))
             .catch(() => toast.error('Failed to load analytics'))
             .finally(() => setLoading(false));
-    }, [paperId]);
+    }, [paperId, toast]);
 
     const exportCSV = () => {
         if (!data?.student_scores?.length) { toast.warning('No data to export yet.'); return; }

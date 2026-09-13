@@ -3,13 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { createPaper, createPaperFromImage } from '../../services/api';
 import Navbar from '../common/Navbar';
 import { useToast } from '../../context/ToastContext';
+import { SUBJECT_CATEGORIES, CLASS_LEVELS } from '../../constants/academic';
 import {
   MdAdd, MdDelete, MdCloudUpload, MdEditNote, MdCheckCircle,
   MdToggleOn, MdToggleOff, MdAccessTime, MdInfoOutline,
   MdFormatListNumbered, MdList, MdRadioButtonChecked, MdClose,
   MdOutlineDescription, MdSchool, MdArrowForward
 } from 'react-icons/md';
-import { BiLoaderAlt, BiExpandAlt } from 'react-icons/bi';
+import { BiLoaderAlt } from 'react-icons/bi';
 
 export default function CreatePaper() {
   const navigate = useNavigate();
@@ -190,19 +191,15 @@ export default function CreatePaper() {
                   onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
                   className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-bold appearance-none cursor-pointer"
                 >
-                  <optgroup label="Sciences">
-                    <option value="science">General Science</option>
-                    <option value="physics">Physics</option>
-                    <option value="chemistry">Chemistry</option>
-                  </optgroup>
-                  <optgroup label="Mathematics">
-                    <option value="mathematics">Mathematics</option>
-                  </optgroup>
-                  <optgroup label="Languages">
-                    <option value="english">English</option>
-                    <option value="hindi">Hindi</option>
-                  </optgroup>
-                  <option value="general">Other / General</option>
+                  {SUBJECT_CATEGORIES.map((g) => (
+                    <optgroup key={g.group} label={g.group}>
+                      {g.options.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
                 </select>
               </div>
               <div>
@@ -214,7 +211,11 @@ export default function CreatePaper() {
                   onChange={(e) => setFormData({ ...formData, class_level: e.target.value })}
                   className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-bold appearance-none cursor-pointer"
                 >
-                  {[8, 9, 10, 11, 12].map(g => <option key={g} value={String(g)}>Grade {g}</option>)}
+                  {CLASS_LEVELS.map((c) => (
+                    <option key={c.value} value={c.value}>
+                      {c.label}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -300,11 +301,15 @@ export default function CreatePaper() {
                     onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
                     className="w-full px-5 py-3.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-bold cursor-pointer"
                   >
-                    <option value="science">Science</option>
-                    <option value="physics">Physics</option>
-                    <option value="chemistry">Chemistry</option>
-                    <option value="mathematics">Mathematics</option>
-                    <option value="english">English</option>
+                    {SUBJECT_CATEGORIES.map((g) => (
+                      <optgroup key={g.group} label={g.group}>
+                        {g.options.map((o) => (
+                          <option key={o.value} value={o.value}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -317,7 +322,11 @@ export default function CreatePaper() {
                     onChange={(e) => setFormData({ ...formData, class_level: e.target.value })}
                     className="w-full px-5 py-3.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-bold cursor-pointer"
                   >
-                    {[8, 9, 10, 11, 12].map(g => <option key={g} value={String(g)}>Grade {g}</option>)}
+                    {CLASS_LEVELS.map((c) => (
+                      <option key={c.value} value={c.value}>
+                        {c.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div>

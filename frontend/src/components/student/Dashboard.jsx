@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import api, { getAvailablePapers, getMySubmissions } from '../../services/api';
+import { getAvailablePapers, getMySubmissions, getExamStatus, getMyProgress } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
+import { getSubjectColor } from '../../constants/academic';
 import Navbar from '../common/Navbar';
 import {
   MdAssignment, MdHistory, MdTrendingUp, MdTrendingDown,
   MdSendToMobile, MdDescription, MdCheckCircle,
-  MdHourglassBottom, MdLockClock, MdSchool, MdArrowForward,
+  MdHourglassBottom, MdSchool,
   MdBarChart, MdKeyboardArrowRight, MdInfoOutline, MdStars
 } from 'react-icons/md';
 import { BiLoaderAlt, BiTrophy } from 'react-icons/bi';
@@ -23,10 +25,18 @@ function toIST(dateStr) {
 function Countdown({ seconds, label }) {
   const [left, setLeft] = useState(seconds);
   useEffect(() => {
-    if (left <= 0) return;
-    const id = setInterval(() => setLeft(l => l - 1), 1000);
+    if (seconds <= 0) return;
+    const id = setInterval(() => {
+      setLeft(l => {
+        if (l <= 1) {
+          clearInterval(id);
+          return 0;
+        }
+        return l - 1;
+      });
+    }, 1000);
     return () => clearInterval(id);
-  }, []);
+  }, [seconds]);
   const h = Math.floor(left / 3600), m = Math.floor((left % 3600) / 60), s = left % 60;
   const fmt = n => String(n).padStart(2, '0');
   return (
@@ -52,7 +62,7 @@ const SUBJECT_COLORS = {
   hindi: 'bg-pink-500', history: 'bg-orange-500', geography: 'bg-cyan-500',
   social_science: 'bg-lime-500',
 };
-const colorClassFor = s => SUBJECT_COLORS[s?.toLowerCase()] || 'bg-slate-400';
+const colorClassFor = s => getSubjectColor(s).bg;
 
 // ── Status Config ─────────────────────────────────────────────────────────────
 const STATUS = {
@@ -74,7 +84,7 @@ function PaperCard({ paper, existingSubId }) {
 
   useEffect(() => {
     if (paper.is_exam_mode) {
-      api.get(`/student/papers/${paper.id}/exam-status`).then(r => setExamStatus(r.data)).catch(() => { });
+      getExamStatus(paper.id).then(r => setExamStatus(r.data)).catch(() => { });
     }
   }, [paper.id, paper.is_exam_mode]);
 
@@ -300,13 +310,14 @@ export default function StudentDashboard() {
   const [progress, setProgress] = useState(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('available');
+  const toast = useToast();
 
   useEffect(() => {
-    Promise.all([getAvailablePapers(), getMySubmissions(), api.get('/student/progress')])
+    Promise.all([getAvailablePapers(), getMySubmissions(), getMyProgress()])
       .then(([p, s, pr]) => { setPapers(p.data); setSubmissions(s.data); setProgress(pr.data); })
-      .catch(console.error)
+      .catch(() => toast.error('Failed to load learning hub data'))
       .finally(() => setLoading(false));
-  }, []);
+  }, [toast]);
 
   const subByPaper = {};
   for (const sub of submissions) subByPaper[sub.paper_id] = sub.id;

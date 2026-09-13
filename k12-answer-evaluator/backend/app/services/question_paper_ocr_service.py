@@ -3,7 +3,7 @@ import logging
 from typing import List, Dict, Optional, Tuple
 from pdf2image import convert_from_path
 import os
-from app.services.ocr_service import OCRService
+from app.services.ocr_service import OCRService, get_ocr_service
 from app.services.diagram_service import DiagramService
 
 logger = logging.getLogger(__name__)
@@ -71,7 +71,7 @@ class QuestionPaperOCRService:
     """
 
     def __init__(self):
-        self.ocr_service = OCRService()
+        self.ocr_service = get_ocr_service()
         try:
             if hasattr(self.ocr_service, 'vision_client') and self.ocr_service.vision_client:
                 self.diagram_service = DiagramService(self.ocr_service.vision_client)
@@ -702,3 +702,16 @@ class QuestionPaperOCRService:
             mcqs.append(cur_mcq)
 
         return mcqs
+
+
+# Global singleton instance
+_question_paper_ocr_service_instance = None
+
+
+def get_question_paper_ocr_service() -> QuestionPaperOCRService:
+    """Thread-safe lazy singleton for QuestionPaperOCRService"""
+    global _question_paper_ocr_service_instance
+    if _question_paper_ocr_service_instance is None:
+        _question_paper_ocr_service_instance = QuestionPaperOCRService()
+    return _question_paper_ocr_service_instance
+

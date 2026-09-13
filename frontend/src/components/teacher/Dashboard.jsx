@@ -1,73 +1,29 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { getMyPapers, deletePaper, getMyTextbooks, uploadTextbook, deleteTextbook } from '../../services/api';
 import Navbar from '../common/Navbar';
 import { useToast } from '../../context/ToastContext';
 import {
-  MdDelete, MdAdd, MdUpload, MdDescription, MdBook, MdGroup,
-  MdBarChart, MdVisibility, MdAssignment, MdSchool, MdArrowForward,
-  MdClose, MdOutlineLibraryBooks, MdOutlineDashboard, MdKeyboardArrowRight,
+  MdDelete, MdAdd, MdUpload, MdDescription, MdGroup,
+  MdBarChart, MdVisibility, MdAssignment, MdArrowForward,
+  MdClose, MdOutlineLibraryBooks, MdOutlineDashboard,
   MdCloudUpload, MdEditNote
 } from 'react-icons/md';
 import { BiLoaderAlt } from 'react-icons/bi';
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-const SUBJECTS = [
-  {
-    group: 'Sciences', options: [
-      { value: 'science', label: 'Science (General)' },
-      { value: 'physics', label: 'Physics' },
-      { value: 'chemistry', label: 'Chemistry' },
-      { value: 'biology', label: 'Biology' },
-      { value: 'environmental_science', label: 'Environmental Science' },
-    ]
-  },
-  { group: 'Mathematics', options: [{ value: 'mathematics', label: 'Mathematics' }] },
-  {
-    group: 'Languages', options: [
-      { value: 'english', label: 'English' },
-      { value: 'hindi', label: 'Hindi' },
-    ]
-  },
-  {
-    group: 'Social Studies', options: [
-      { value: 'social_science', label: 'Social Science (General)' },
-      { value: 'history', label: 'History' },
-      { value: 'geography', label: 'Geography' },
-      { value: 'civics', label: 'Civics / Political Science' },
-    ]
-  },
-  {
-    group: 'Commerce / Humanities', options: [
-      { value: 'economics', label: 'Economics' },
-      { value: 'accountancy', label: 'Accountancy' },
-      { value: 'business_studies', label: 'Business Studies' },
-    ]
-  },
-  { group: 'Other', options: [{ value: 'general', label: 'General' }] },
-];
+import {
+  SUBJECT_CATEGORIES,
+  CLASS_LEVELS,
+  getSubjectLabel,
+  getClassLabel,
+  getSubjectColor,
+} from '../../constants/academic';
+import { ROUTES } from '../../constants/routes';
 
-const CLASS_LEVELS = [
-  { value: 'kg', label: 'Kindergarten (KG)' },
-  ...[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(g => ({ value: String(g), label: `Grade ${g}` })),
-];
-
-const labelForSubject = (val) => {
-  for (const g of SUBJECTS) for (const o of g.options) if (o.value === val) return o.label;
-  return val;
-};
-const labelForClass = (val) => {
-  const found = CLASS_LEVELS.find(c => c.value === val);
-  return found ? found.label : (val ? `Grade ${val}` : '—');
-};
-
-const SUBJECT_COLORS = {
-  mathematics: 'bg-indigo-500', science: 'bg-emerald-500', physics: 'bg-blue-500',
-  chemistry: 'bg-amber-500', biology: 'bg-green-600', english: 'bg-violet-500',
-  hindi: 'bg-pink-500', history: 'bg-orange-500', geography: 'bg-cyan-500',
-  social_science: 'bg-lime-500',
-};
-const colorClassFor = (s) => SUBJECT_COLORS[s?.toLowerCase()] || 'bg-slate-400';
+const colorClassFor = (s) => getSubjectColor(s).bg;
+const labelForSubject = getSubjectLabel;
+const labelForClass = getClassLabel;
+const SUBJECTS = SUBJECT_CATEGORIES;
 
 const INPUT_STYLE = "w-full px-5 py-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium outline-none";
 
@@ -284,18 +240,21 @@ export default function TeacherDashboard() {
   const [showUpload, setShowUpload] = useState(false);
   const toast = useToast();
 
-  useEffect(() => { loadPapers(); loadTextbooks(); }, []);
-
-  const loadPapers = async () => {
+  const loadPapers = useCallback(async () => {
     try { const res = await getMyPapers(); setPapers(res.data); }
     catch { toast.error('Failed to load papers'); }
     finally { setLoading(false); }
-  };
+  }, [toast]);
 
-  const loadTextbooks = async () => {
+  const loadTextbooks = useCallback(async () => {
     try { const res = await getMyTextbooks(); setTextbooks(res.data); }
     catch { toast.error('Failed to load textbooks'); }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    loadPapers();
+    loadTextbooks();
+  }, [loadPapers, loadTextbooks]);
 
   const handleDelete = async (paperId) => {
     if (!window.confirm('Delete this paper? This cannot be undone.')) return;

@@ -1,13 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getPaper, updatePaper } from '../../services/api';
 import Navbar from '../common/Navbar';
 import { useToast } from '../../context/ToastContext';
+import { SUBJECT_CATEGORIES, CLASS_LEVELS } from '../../constants/academic';
 import {
-  MdAdd, MdDelete, MdEditNote, MdCheckCircle,
+  MdAdd, MdDelete, MdCheckCircle,
   MdToggleOn, MdToggleOff, MdAccessTime, MdInfoOutline,
-  MdFormatListNumbered, MdList, MdRadioButtonChecked, MdClose,
-  MdOutlineDescription, MdSchool, MdArrowForward
+  MdFormatListNumbered, MdList, MdRadioButtonChecked
 } from 'react-icons/md';
 import { BiLoaderAlt } from 'react-icons/bi';
 
@@ -33,11 +33,7 @@ export default function EditPaper() {
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
 
-  useEffect(() => {
-    loadPaper();
-  }, [paperId]);
-
-  const loadPaper = async () => {
+  const loadPaper = useCallback(async () => {
     setFetching(true);
     try {
       const res = await getPaper(paperId);
@@ -62,7 +58,11 @@ export default function EditPaper() {
     } finally {
       setFetching(false);
     }
-  };
+  }, [paperId, toast, navigate]);
+
+  useEffect(() => {
+    loadPaper();
+  }, [loadPaper]);
 
   const addQuestion = () => {
     setQuestions([
@@ -173,11 +173,15 @@ export default function EditPaper() {
                   onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
                   className="w-full px-5 py-3.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-bold cursor-pointer"
                 >
-                  <option value="science">Science</option>
-                  <option value="physics">Physics</option>
-                  <option value="chemistry">Chemistry</option>
-                  <option value="mathematics">Mathematics</option>
-                  <option value="english">English</option>
+                  {SUBJECT_CATEGORIES.map((g) => (
+                    <optgroup key={g.group} label={g.group}>
+                      {g.options.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
                 </select>
               </div>
             </div>
@@ -190,7 +194,11 @@ export default function EditPaper() {
                   onChange={(e) => setFormData({ ...formData, class_level: e.target.value })}
                   className="w-full px-5 py-3.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-bold cursor-pointer"
                 >
-                  {[8, 9, 10, 11, 12].map(g => <option key={g} value={String(g)}>Grade {g}</option>)}
+                  {CLASS_LEVELS.map((c) => (
+                    <option key={c.value} value={c.value}>
+                      {c.label}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>

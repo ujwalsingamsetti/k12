@@ -1,7 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Navbar from '../common/Navbar';
-import api from '../../services/api';
+import {
+    getPaper,
+    getStudents,
+    getPaperAssignments,
+    assignPaper,
+    removeAssignment,
+} from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 import {
     MdChevronLeft, MdPerson, MdSearch, MdEvent,
@@ -32,9 +38,9 @@ export default function AssignPaper() {
 
     useEffect(() => {
         Promise.all([
-            api.get(`/teacher/papers/${paperId}`),
-            api.get('/teacher/students'),
-            api.get(`/teacher/papers/${paperId}/assignments`),
+            getPaper(paperId),
+            getStudents(),
+            getPaperAssignments(paperId),
         ]).then(([paperRes, studentsRes, assignRes]) => {
             setPaper(paperRes.data);
             setStudents(studentsRes.data);
@@ -43,7 +49,7 @@ export default function AssignPaper() {
             setSelected(assignedIds);
         }).catch(() => toast.error('Failed to load data'))
             .finally(() => setLoading(false));
-    }, [paperId]);
+    }, [paperId, toast]);
 
     const assignedIds = new Set(assignments.map(a => a.student_id));
 
@@ -58,11 +64,8 @@ export default function AssignPaper() {
     const handleSave = async () => {
         setSaving(true);
         try {
-            await api.post(`/teacher/papers/${paperId}/assign`, {
-                student_ids: [...selected],
-                due_date: dueDate || null,
-            });
-            const res = await api.get(`/teacher/papers/${paperId}/assignments`);
+            await assignPaper(paperId, [...selected], dueDate || null);
+            const res = await getPaperAssignments(paperId);
             setAssignments(res.data);
             toast.success(`Successfully assigned to ${selected.size} student(s)`);
         } catch {
@@ -75,7 +78,7 @@ export default function AssignPaper() {
     const handleRemove = async (studentId) => {
         if (!confirm('Remove assignment for this student?')) return;
         try {
-            await api.delete(`/teacher/papers/${paperId}/assignments/${studentId}`);
+            await removeAssignment(paperId, studentId);
             setAssignments(prev => prev.filter(a => a.student_id !== studentId));
             setSelected(prev => { const n = new Set(prev); n.delete(studentId); return n; });
             toast.success('Assignment removed');

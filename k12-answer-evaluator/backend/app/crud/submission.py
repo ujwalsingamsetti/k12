@@ -45,19 +45,29 @@ def get_paper_submissions(db: Session, paper_id: UUID) -> List:
         AnswerSubmission.paper_id == paper_id
     ).all()
     
+    if not submissions:
+        return []
+
+    # Batch fetch all evaluations for these submissions in a single query (eliminates N+1 queries)
+    sub_ids = [sub.id for sub, _, _ in submissions]
+    all_evals = (
+        db.query(Evaluation)
+        .filter(Evaluation.submission_id.in_(sub_ids))
+        .options(joinedload(Evaluation.question))
+        .all()
+    )
+
+    from collections import defaultdict
+    evals_by_sub = defaultdict(list)
+    for e in all_evals:
+        evals_by_sub[e.submission_id].append(e)
+
     result = []
     for submission, student_name, student_email in submissions:
-        total_marks = db.query(func.sum(Evaluation.marks_obtained)).filter(
-            Evaluation.submission_id == submission.id
-        ).scalar() or 0
-        
-        max_marks = db.query(func.sum(Evaluation.max_marks)).filter(
-            Evaluation.submission_id == submission.id
-        ).scalar() or 0
+        evals = evals_by_sub.get(submission.id, [])
 
-        evals = db.query(Evaluation).filter(
-            Evaluation.submission_id == submission.id
-        ).options(joinedload(Evaluation.question)).all()
+        total_marks = sum(e.marks_obtained or 0 for e in evals)
+        max_marks = sum(e.max_marks or 0 for e in evals)
 
         evaluations_data = [{
             "question_id": str(e.id),      # evaluation row id (for override endpoint)

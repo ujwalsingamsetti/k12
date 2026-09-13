@@ -21,7 +21,7 @@ from app.schemas.submission import SubmissionList
 from app.crud import question_paper as crud_paper
 from app.crud import submission as crud_submission
 from app.services.textbook_ingestion_service import TextbookIngestionService
-from app.services.question_paper_ocr_service import QuestionPaperOCRService
+from app.services.question_paper_ocr_service import QuestionPaperOCRService, get_question_paper_ocr_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/teacher", tags=["teacher"])
@@ -60,8 +60,8 @@ async def extract_questions_from_image(
             
             file_paths.append(file_path)
         
-        # Extract questions using mixed file processor
-        ocr_service = QuestionPaperOCRService()
+        # Extract questions using mixed file processor (reusing singleton)
+        ocr_service = get_question_paper_ocr_service()
         questions = ocr_service.extract_questions_from_mixed_files(file_paths)
         
         if not questions:
@@ -318,8 +318,8 @@ async def create_paper_from_image(
                     f.write(content)
                 saved_pdf_path = permanent_path
         
-        # Extract questions using mixed file processor
-        ocr_service = QuestionPaperOCRService()
+        # Extract questions using mixed file processor (reusing singleton)
+        ocr_service = get_question_paper_ocr_service()
         questions = ocr_service.extract_questions_from_mixed_files(file_paths)
         
         if not questions:

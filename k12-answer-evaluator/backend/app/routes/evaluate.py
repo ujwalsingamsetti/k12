@@ -11,32 +11,23 @@ import uuid
 from app.config import settings
 from app.models import EvaluationRequest, EvaluationStatus
 from app.routes.upload import get_upload_metadata
-from app.services.ocr_service import OCRService
+from app.services.ocr_service import get_ocr_service
 from app.services.answer_parser import AnswerSheetParser
-from app.services.rag_service import RAGService
-from app.services.evaluation_service import EvaluationService
+from app.services.rag_service import get_rag_service
+from app.services.evaluation_service import get_evaluation_service
 
 router = APIRouter(tags=["Evaluation"])
 logger = logging.getLogger(__name__)
 
-ocr_service = None
 parser_service = None
-rag_service = None
-eval_service = None
 
 def get_services():
-    """Lazy initialization of services"""
-    global ocr_service, parser_service, rag_service, eval_service
-    
-    if ocr_service is None:
-        logger.info("Initializing services...")
-        ocr_service = OCRService()
+    """Retrieve shared singleton service instances"""
+    global parser_service
+    if parser_service is None:
         parser_service = AnswerSheetParser()
-        rag_service = RAGService()
-        eval_service = EvaluationService()
-        logger.info("Services initialized successfully")
     
-    return ocr_service, parser_service, rag_service, eval_service
+    return get_ocr_service(), parser_service, get_rag_service(), get_evaluation_service()
 
 def save_evaluation_result(evaluation_id: str, result: dict) -> None:
     """Save evaluation result to disk"""

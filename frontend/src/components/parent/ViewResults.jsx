@@ -1,15 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getParentSubmissionDetails } from '../../services/api';
+import { getParentSubmissionDetails, getParentSubmissionImageBlob } from '../../services/api';
 import Navbar from '../common/Navbar';
 import {
     MdChevronLeft, MdEvent, MdAccessTime, MdCheckCircle, MdPendingActions,
     MdErrorOutline, MdInfoOutline, MdFormatListNumbered,
     MdBarChart, MdKeyboardArrowRight, MdStars, MdCheck, MdClose, MdLightbulbOutline
 } from 'react-icons/md';
-import { BiLoaderAlt, BiTrophy } from 'react-icons/bi';
-
-const API_BASE = 'http://localhost:8000';
+import { BiLoaderAlt } from 'react-icons/bi';
 
 function toIST(dateStr) {
     const d = new Date(dateStr);
@@ -26,18 +24,10 @@ function AnswerSheetPage({ submissionId, pageIndex, totalPages }) {
     const [blobUrl, setBlobUrl] = useState(null);
 
     useEffect(() => {
-        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-        const apiBase = typeof API_BASE !== 'undefined' ? API_BASE : '';
-        const url = `${apiBase}/api/parent/submissions/${submissionId}/image?page=${pageIndex + 1}`;
         let objectUrl = null;
-
-        fetch(url, { headers: { Authorization: `Bearer ${token}` } })
-            .then(res => {
-                if (!res.ok) throw new Error('Image load failed');
-                return res.blob();
-            })
-            .then(blob => {
-                objectUrl = URL.createObjectURL(blob);
+        getParentSubmissionImageBlob(submissionId, pageIndex + 1)
+            .then((res) => {
+                objectUrl = URL.createObjectURL(res.data);
                 setBlobUrl(objectUrl);
                 setLoaded(true);
             })

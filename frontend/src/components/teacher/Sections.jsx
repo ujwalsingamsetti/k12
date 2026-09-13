@@ -1,7 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../common/Navbar';
-import api from '../../services/api';
+import {
+    getSections,
+    getStudents,
+    getMyPapers,
+    createSection as createSectionApi,
+    deleteSection as deleteSectionApi,
+    getSectionMembers,
+    updateSectionMembers,
+    assignSectionPaper,
+} from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 import {
     MdGroup, MdAdd, MdDelete, MdChevronLeft, MdSave,
@@ -37,22 +46,22 @@ export default function Sections() {
 
     useEffect(() => {
         Promise.all([
-            api.get('/teacher/sections'),
-            api.get('/teacher/students'),
-            api.get('/teacher/papers'),
+            getSections(),
+            getStudents(),
+            getMyPapers(),
         ]).then(([s, st, p]) => {
             setSections(s.data);
             setStudents(st.data);
             setPapers(p.data);
         }).catch(() => toast.error('Failed to load data'))
             .finally(() => setLoading(false));
-    }, []);
+    }, [toast]);
 
     const createSection = async () => {
         if (!form.name.trim()) return;
         setCreating(true);
         try {
-            const res = await api.post('/teacher/sections', form);
+            const res = await createSectionApi(form);
             setSections(prev => [...prev, res.data]);
             setShowCreate(false);
             setForm({ name: '', class_level: '', subject: '' });
@@ -67,7 +76,7 @@ export default function Sections() {
     const deleteSection = async (id) => {
         if (!confirm('Delete this section?')) return;
         try {
-            await api.delete(`/teacher/sections/${id}`);
+            await deleteSectionApi(id);
             setSections(prev => prev.filter(s => s.id !== id));
             if (activeSection?.id === id) setActiveSection(null);
             toast.success('Section deleted');
@@ -80,7 +89,7 @@ export default function Sections() {
         setActiveSection(section);
         setSearchStudent('');
         try {
-            const res = await api.get(`/teacher/sections/${section.id}/members`);
+            const res = await getSectionMembers(section.id);
             setMemberIds(new Set(res.data.map(m => m.student_id)));
         } catch {
             toast.error('Failed to load members');
@@ -90,7 +99,7 @@ export default function Sections() {
     const saveMembers = async () => {
         setSavingMembers(true);
         try {
-            await api.put(`/teacher/sections/${activeSection.id}/members`, { student_ids: [...memberIds] });
+            await updateSectionMembers(activeSection.id, [...memberIds]);
             setSections(prev => prev.map(s => s.id === activeSection.id ? { ...s, member_count: memberIds.size } : s));
             toast.success(`Saved ${memberIds.size} members`);
             setActiveSection(null);
@@ -105,9 +114,11 @@ export default function Sections() {
         if (!selectedPaper) return;
         setAssigning(true);
         try {
-            const res = await api.post(`/teacher/sections/${assignPaper.id}/assign-paper/${selectedPaper}`, null, {
-                params: dueDate ? { due_date: new Date(dueDate).toISOString() } : {}
-            });
+            const res = await assignSectionPaper(
+                assignPaper.id,
+                selectedPaper,
+                dueDate ? new Date(dueDate).toISOString() : null
+            );
             toast.success(res.data.message || 'Paper assigned successfully!');
             setAssignPaper(null);
         } catch {

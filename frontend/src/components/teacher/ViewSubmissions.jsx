@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import Navbar from '../common/Navbar';
-import api, { getStudents, teacherSubmitAnswer } from '../../services/api';
+import { getPaper, getPaperSubmissions, overrideEvaluation, getStudents, teacherSubmitAnswer } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 import {
   MdChevronLeft, MdPerson, MdMailOutline, MdEvent, MdCheckCircle,
-  MdPendingActions, MdErrorOutline, MdAutoGraph, MdFilterList,
+  MdPendingActions, MdErrorOutline, MdAutoGraph,
   MdAssignmentInd, MdBarChart, MdKeyboardArrowDown, MdKeyboardArrowUp,
   MdEdit, MdClose, MdInfoOutline
 } from 'react-icons/md';
@@ -58,10 +58,9 @@ function OverrideModal({ evaluation, onClose, onSaved }) {
     }
     setSaving(true);
     try {
-      await api.patch(`/teacher/evaluations/${evaluation.question_id}/override`, {
-        marks: m, comment
-      });
-      onSaved(evaluation.question_id, m, comment);
+      const evalId = evaluation.id || evaluation.question_id;
+      await overrideEvaluation(evalId, m, comment);
+      onSaved(evalId, m, comment);
       toast.success('Evaluation overridden');
       onClose();
     } catch (e) {
@@ -290,7 +289,7 @@ function UploadAnswerModal({ paperId, onClose, onUploaded }) {
       }
     };
     fetchStudents();
-  }, []);
+  }, [toast]);
 
   const handleFileChange = (e) => {
     const selectedFiles = Array.from(e.target.files);
@@ -457,8 +456,8 @@ export default function ViewSubmissions() {
 
   const loadSubmissions = () => {
     Promise.all([
-      api.get(`/teacher/papers/${paperId}`),
-      api.get(`/teacher/papers/${paperId}/submissions`),
+      getPaper(paperId),
+      getPaperSubmissions(paperId),
     ]).then(([paperRes, subsRes]) => {
       setPaper(paperRes.data);
       setSubmissions(subsRes.data);
@@ -467,8 +466,8 @@ export default function ViewSubmissions() {
 
   useEffect(() => {
     Promise.all([
-      api.get(`/teacher/papers/${paperId}`),
-      api.get(`/teacher/papers/${paperId}/submissions`),
+      getPaper(paperId),
+      getPaperSubmissions(paperId),
     ]).then(([paperRes, subsRes]) => {
       setPaper(paperRes.data);
       setSubmissions(subsRes.data);

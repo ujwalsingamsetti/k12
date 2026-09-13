@@ -3,7 +3,7 @@ import logging
 from typing import Dict, Optional
 from google import genai
 from google.genai import types
-from app.services.rag_service import RAGService
+from app.services.rag_service import get_rag_service
 
 logger = logging.getLogger(__name__)
 
@@ -11,10 +11,10 @@ class MCQAnswerFinder:
     """Find correct MCQ answers using RAG + LLM"""
     
     def __init__(self):
-        self.rag_service = RAGService()
+        self.rag_service = get_rag_service()
         api_key = os.environ.get("GEMINI_API_KEY")
         self.client = genai.Client(api_key=api_key)
-        self.model_name = 'gemini-2.5-flash'
+        self.model_name = os.environ.get("GEMINI_MODEL", "gemini-1.5-flash")
     
     def find_correct_answer(
         self,
@@ -94,3 +94,16 @@ Answer:"""
         except Exception as e:
             logger.error(f"Error finding correct answer: {e}")
             return None
+
+
+# Global singleton instance
+_mcq_answer_finder_instance = None
+
+
+def get_mcq_answer_finder() -> MCQAnswerFinder:
+    """Thread-safe lazy singleton for MCQAnswerFinder"""
+    global _mcq_answer_finder_instance
+    if _mcq_answer_finder_instance is None:
+        _mcq_answer_finder_instance = MCQAnswerFinder()
+    return _mcq_answer_finder_instance
+

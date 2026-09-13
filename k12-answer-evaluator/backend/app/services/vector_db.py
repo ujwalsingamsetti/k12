@@ -60,6 +60,20 @@ class VectorDBService:
             )
             
             logger.info(f"Created collection '{self.collection_name}' with vector size {self.settings.qdrant_vector_size}")
+            
+            # Create payload indexes for fast filtered searches
+            try:
+                from qdrant_client.models import PayloadSchemaType
+                for field in ["subject", "class_level"]:
+                    self.client.create_payload_index(
+                        collection_name=self.collection_name,
+                        field_name=field,
+                        field_schema=PayloadSchemaType.KEYWORD
+                    )
+                logger.info("Created payload indexes on 'subject' and 'class_level'")
+            except Exception as pe:
+                logger.warning(f"Could not create payload indexes: {pe}")
+            
             return True
         
         except Exception as e:

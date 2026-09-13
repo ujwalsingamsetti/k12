@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getSubmissionDetails } from '../../services/api';
+import { getSubmissionDetails, getSubmissionImageBlob, downloadSubmissionReport } from '../../services/api';
 import Navbar from '../common/Navbar';
 import { useToast } from '../../context/ToastContext';
 import {
@@ -9,8 +9,6 @@ import {
   MdBarChart, MdKeyboardArrowRight, MdStars, MdCheck, MdClose, MdLightbulbOutline
 } from 'react-icons/md';
 import { BiLoaderAlt, BiTrophy } from 'react-icons/bi';
-
-const API_BASE = 'http://localhost:8000';
 
 function toIST(dateStr) {
   const d = new Date(dateStr);
@@ -27,24 +25,18 @@ function AnswerSheetPage({ submissionId, pageIndex, totalPages }) {
   const [blobUrl, setBlobUrl] = useState(null);
 
   useEffect(() => {
-    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-    const apiBase = typeof API_BASE !== 'undefined' ? API_BASE : '';
-    const url = `${apiBase}/api/student/submissions/${submissionId}/image?page=${pageIndex + 1}`;
     let objectUrl = null;
-
-    fetch(url, { headers: { Authorization: `Bearer ${token}` } })
-      .then(res => {
-        if (!res.ok) throw new Error('Image load failed');
-        return res.blob();
-      })
-      .then(blob => {
-        objectUrl = URL.createObjectURL(blob);
+    getSubmissionImageBlob(submissionId, pageIndex + 1)
+      .then((res) => {
+        objectUrl = URL.createObjectURL(res.data);
         setBlobUrl(objectUrl);
         setLoaded(true);
       })
       .catch(() => setError(true));
 
-    return () => { if (objectUrl) URL.revokeObjectURL(objectUrl); };
+    return () => {
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
   }, [submissionId, pageIndex]);
 
   return (
@@ -124,20 +116,8 @@ export default function ViewResults() {
 
   const handleDownload = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`${API_BASE}/api/v2/submissions/${submissionId}/report`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error();
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `Report_${submissionId.substring(0, 8)}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      await downloadSubmissionReport(submissionId);
+      toast.success('Report card downloaded successfully!');
     } catch {
       toast.error('Could not generate PDF report');
     }

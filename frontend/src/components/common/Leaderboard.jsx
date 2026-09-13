@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Navbar from './Navbar';
-import api from '../../services/api';
+import { getLeaderboard } from '../../services/api';
+import { useToast } from '../../context/ToastContext';
 import {
-    MdChevronLeft, MdEvent, MdPeople, MdStars, MdCheckCircle,
-    MdArrowUpward, MdBarChart, MdKeyboardArrowRight, MdAssignment
+    MdChevronLeft, MdPeople, MdStars, MdAssignment
 } from 'react-icons/md';
 import { BiLoaderAlt, BiTrophy } from 'react-icons/bi';
 
@@ -33,15 +33,16 @@ function GradeChip({ grade }) {
 export default function Leaderboard() {
     const { paperId } = useParams();
     const navigate = useNavigate();
+    const toast = useToast();
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        api.get(`/v2/papers/${paperId}/leaderboard`)
+        getLeaderboard(paperId)
             .then(r => setData(r.data))
-            .catch(e => console.error(e))
+            .catch(() => toast.error('Failed to load leaderboard'))
             .finally(() => setLoading(false));
-    }, [paperId]);
+    }, [paperId, toast]);
 
     if (loading) return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors">

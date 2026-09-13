@@ -4,6 +4,8 @@ from sqlalchemy.orm import Session
 from typing import List
 import os
 import uuid
+import asyncio
+import aiofiles
 from datetime import datetime
 from app.core.database import get_db
 from app.core.config import settings
@@ -17,10 +19,10 @@ from app.crud import question_paper as crud_paper
 from app.crud import submission as crud_submission
 from app.crud import evaluation as crud_evaluation
 from app.crud import user as crud_user
-from app.services.ocr_service import OCRService
+from app.services.ocr_service import get_ocr_service, OCRService
 from app.services.answer_parser import AnswerParser
-from app.services.rag_service import RAGService
-from app.services.evaluation_service import EvaluationService
+from app.services.rag_service import get_rag_service, RAGService
+from app.services.evaluation_service import get_evaluation_service, EvaluationService
 from app.services.mcq_evaluator import evaluate_mcq
 
 router = APIRouter(prefix="/student", tags=["student"])
@@ -83,9 +85,9 @@ async def submit_answer(
         file_id = str(uuid.uuid4())
         file_path = os.path.join(upload_dir, f"{file_id}_page{idx+1}{file_ext}")
         
-        with open(file_path, "wb") as f:
+        async with aiofiles.open(file_path, "wb") as f:
             content = await file.read()
-            f.write(content)
+            await f.write(content)
         
         file_paths.append(file_path)
     
@@ -107,8 +109,8 @@ def process_submission_multiple(submission_id: str, image_paths: list, paper_id:
     from app.core.database import SessionLocal
     db = SessionLocal()
     try:
-        # OCR all images and combine text + diagrams
-        ocr_service = OCRService()
+        # OCR all images and combine text + diagrams (reusing singleton)
+        ocr_service = get_ocr_service()
         all_text = []
         all_diagrams = []
         
@@ -191,11 +193,11 @@ def process_submission_multiple(submission_id: str, image_paths: list, paper_id:
                     mapped_answers[best_q.question_number] = ans_text
                     unmapped_questions.remove(best_q)
         
-        # Evaluate each question
-        rag_service = RAGService()
-        eval_service = EvaluationService()
+        # Concurrently evaluate questions using singleton services
+        rag_service = get_rag_service()
+        eval_service = get_evaluation_service()
         
-        for question in paper.questions:
+        async def evaluate_single_question(question):
             student_answer = mapped_answers.get(question.question_number, "").strip()
             
             # Match question type
@@ -204,16 +206,13 @@ def process_submission_multiple(submission_id: str, image_paths: list, paper_id:
             else:
                 q_type = str(question.question_type)
 
-            # Log question matching
             print(f"\nQ{question.question_number} [{q_type}]: {question.question_text[:80]}...")
             print(f"Student answer: {student_answer[:100] if student_answer else '(empty branch)'}...")
             
             if q_type == "mcq":
-                # Evaluate MCQ (simple comparison, no RAG)
                 result = evaluate_mcq(question, student_answer)
                 context_chunks = []
             elif not student_answer:
-                # Descriptive but empty - award 0 without calling AI
                 result = {
                     "score": 0,
                     "score_breakdown": {"correctness": 0, "completeness": 0, "understanding": 0},
@@ -225,7 +224,6 @@ def process_submission_multiple(submission_id: str, image_paths: list, paper_id:
                 }
                 context_chunks = []
             else:
-                # Evaluate descriptive question
                 diagram_info = None
                 if all_diagrams:
                     question_shapes = []
@@ -237,33 +235,21 @@ def process_submission_multiple(submission_id: str, image_paths: list, paper_id:
                     if question_shapes:
                         diagram_info = {"has_diagrams": True, "shapes_detected": question_shapes}
                 
-                # Build question paper context
                 qp_context = f"Question {question.question_number} ({question.marks} marks): {question.question_text}"
                 if question.section:
                     qp_context = f"Section {question.section} - " + qp_context
                 
-                # RAG retrieval with question paper context prioritized
-                context_chunks = rag_service.retrieve_relevant_context(
+                context_chunks = await rag_service.retrieve_relevant_context_async(
                     question.question_text,
                     subject=paper.subject.value,
                     question_paper_context=qp_context,
                     class_level=str(paper.class_level)
                 )
                 context = rag_service.format_context_for_llm(context_chunks)
-                
-                # Extract RAG scores for confidence calculation
                 rag_scores = [c.get('score', 0) for c in context_chunks if c.get('source') == 'textbook']
-                
-                # Get marking scheme if available
                 marking_scheme = question.marking_scheme if hasattr(question, 'marking_scheme') else None
                 
-                # Log RAG retrieval
-                print(f"RAG retrieved {len(context_chunks)} chunks for Q{question.question_number}")
-                if context_chunks:
-                    print(f"Top chunk score: {context_chunks[0].get('score', 0):.3f}")
-                    print(f"Context preview: {context[:150]}...")
-                
-                result = eval_service.evaluate_answer(
+                result = await eval_service.evaluate_answer_async(
                     question=question.question_text,
                     student_answer=student_answer,
                     textbook_context=context,
@@ -277,41 +263,46 @@ def process_submission_multiple(submission_id: str, image_paths: list, paper_id:
                     academic_level=str(paper.class_level)
                 )
             
-            # Store evaluation
             import json
-            crud_evaluation.create_evaluation(
-                db,
-                submission_id=submission_id,
-                question_id=question.id,
-                student_answer=student_answer,
-                marks_obtained=result.get("score", 0),
-                max_marks=question.marks,
-                feedback=json.dumps(result),
-                rag_context=json.dumps(context_chunks)
-            )
-            
-            print(f"Q{question.question_number} evaluated: {result.get('score', 0)}/{question.marks} marks")
+            return {
+                "submission_id": submission_id,
+                "question_id": question.id,
+                "question_number": question.question_number,
+                "student_answer": student_answer,
+                "marks_obtained": result.get("score", 0),
+                "max_marks": question.marks,
+                "feedback": json.dumps(result),
+                "rag_context": json.dumps(context_chunks)
+            }
+
+        async def evaluate_all_questions():
+            sem = asyncio.Semaphore(4)
+            async def bounded_eval(q):
+                async with sem:
+                    return await evaluate_single_question(q)
+            return await asyncio.gather(*[bounded_eval(q) for q in paper.questions])
+
+        evaluations_data = asyncio.run(evaluate_all_questions())
+
+        # Bulk save evaluations in a single database transaction
+        crud_evaluation.bulk_create_evaluations(db, evaluations_data)
+        
+        for e in evaluations_data:
+            print(f"Q{e['question_number']} evaluated: {e['marks_obtained']}/{e['max_marks']} marks")
         
         print(f"\n=== EVALUATION COMPLETE ===")
         crud_submission.update_submission_status(db, submission_id, SubmissionStatus.EVALUATED)
 
-        # ── Fire "graded" notification to the student ────────────────────────
+        # Fire "graded" notification (computed in-memory without extra DB queries)
         try:
             from app.models.submission import AnswerSubmission
-            from app.models.question_paper import QuestionPaper
             from app.utils.notify import create_notification
-            from sqlalchemy import func as _func
-            from app.models.evaluation import Evaluation
             sub = db.query(AnswerSubmission).filter(AnswerSubmission.id == submission_id).first()
             if sub:
                 paper_obj = crud_paper.get_paper(db, paper_id)
-                total = db.query(_func.sum(Evaluation.marks_obtained)).filter(
-                    Evaluation.submission_id == submission_id
-                ).scalar() or 0
-                max_m = db.query(_func.sum(Evaluation.max_marks)).filter(
-                    Evaluation.submission_id == submission_id
-                ).scalar() or 1
-                pct = round(float(total) / float(max_m) * 100, 1) if max_m else 0
+                total = sum(e["marks_obtained"] for e in evaluations_data)
+                max_m = sum(e["max_marks"] for e in evaluations_data) or 1
+                pct = round(float(total) / float(max_m) * 100, 1)
                 paper_title = paper_obj.title if paper_obj else "your paper"
                 create_notification(
                     db, str(sub.student_id),
@@ -335,124 +326,8 @@ def process_submission_multiple(submission_id: str, image_paths: list, paper_id:
         db.close()
 
 def process_submission(submission_id: str, image_path: str, paper_id: str, _old_db: Session = None):
-    from app.core.database import SessionLocal
-    db = SessionLocal()
-    try:
-        # OCR with diagram extraction
-        ocr_service = OCRService()
-        extracted_text, diagram_metadata = ocr_service.extract_text_from_image(image_path)
-        crud_submission.update_submission_text(db, submission_id, extracted_text)
-        
-        # Store diagram metadata
-        if diagram_metadata.get("has_diagrams"):
-            import json
-            from app.models.submission import AnswerSubmission
-            submission = db.query(AnswerSubmission).filter(AnswerSubmission.id == submission_id).first()
-            if submission:
-                submission.diagram_metadata = diagram_metadata
-                db.commit()
-        
-        # Parse answers
-        parser = AnswerParser()
-        parsed_answers = parser.parse_answers(extracted_text)
-        
-        # Get paper questions
-        paper = crud_paper.get_paper(db, paper_id)
-        
-        # Smart Answer Mapping (Hackathon fallback for misnumbered OCR)
-        mapped_answers = {}
-        if len(paper.questions) == 1:
-            # For a single-question paper, bypass completely and give it ALL the OCR text
-            mapped_answers[paper.questions[0].question_number] = extracted_text
-        else:
-            unmapped_answers = []
-            for q_num, ans_text in parsed_answers.items():
-                if any(q.question_number == q_num for q in paper.questions):
-                    mapped_answers[q_num] = ans_text
-                else:
-                    unmapped_answers.append(ans_text)
-                    
-            unmapped_questions = [q for q in paper.questions if q.question_number not in mapped_answers]
-            
-            import re
-            for ans_text in unmapped_answers:
-                if not unmapped_questions:
-                    break
-                
-                # For a single missing map, just assign it directly
-                if len(unmapped_answers) == 1 and len(unmapped_questions) == 1:
-                    mapped_answers[unmapped_questions[0].question_number] = ans_text
-                    unmapped_questions.pop(0)
-                    break
-                    
-                best_q = None
-                best_score = -1
-                ans_words = set(re.findall(r'\w+', ans_text.lower()))
-                
-                for q in unmapped_questions:
-                    q_words = set(re.findall(r'\w+', q.question_text.lower()))
-                    score = len(ans_words.intersection(q_words))
-                    if score > best_score:
-                        best_score = score
-                        best_q = q
-                
-                if best_q:
-                    mapped_answers[best_q.question_number] = ans_text
-                    unmapped_questions.remove(best_q)
-        
-        # Evaluate each question
-        rag_service = RAGService()
-        eval_service = EvaluationService()
-        
-        for question in paper.questions:
-            student_answer = mapped_answers.get(question.question_number, "").strip()
-            
-            # Get RAG context
-            context_chunks = rag_service.retrieve_relevant_context(
-                question.question_text,
-                subject=paper.subject.value,
-                class_level=str(paper.class_level)
-            )
-            context = rag_service.format_context_for_llm(context_chunks)
-            
-            # Evaluate with diagram info
-            result = eval_service.evaluate_answer(
-                question=question.question_text,
-                student_answer=student_answer,
-                textbook_context=context,
-                subject=paper.subject.value,
-                class_level=str(paper.class_level),
-                max_score=question.marks,
-                diagram_info=diagram_metadata if diagram_metadata.get("has_diagrams") else None,
-                system_type=getattr(paper, "system_type", "general"),
-                academic_level=str(paper.class_level)
-            )
-            
-            # Store evaluation
-            import json
-            crud_evaluation.create_evaluation(
-                db,
-                submission_id=submission_id,
-                question_id=question.id,
-                student_answer=student_answer,
-                marks_obtained=result.get("score", 0),
-                max_marks=question.marks,
-                feedback=json.dumps(result),
-                rag_context=json.dumps(context_chunks)
-            )
-        
-        crud_submission.update_submission_status(db, submission_id, SubmissionStatus.EVALUATED)
-        
-    except Exception as e:
-        print(f"Error processing submission: {e}")
-        import traceback
-        traceback.print_exc()
-        try:
-            crud_submission.update_submission_status(db, submission_id, SubmissionStatus.FAILED)
-        except:
-            pass
-    finally:
-        db.close()
+    """Backward compatibility wrapper delegating to process_submission_multiple"""
+    return process_submission_multiple(submission_id, [image_path], paper_id, _old_db)
 
 @router.get("/submissions", response_model=List[Submission])
 def get_my_submissions(
@@ -617,13 +492,24 @@ def get_my_progress(
     timeline = []
     subject_buckets = {}  # subject -> list of (pct, submitted_at)
 
+    # Batch compute total marks and max marks for all student submissions (eliminates 2*N queries)
+    sub_ids = [sub.id for sub, _ in rows]
+    eval_totals = {}
+    if sub_ids:
+        sums = (
+            db.query(
+                Evaluation.submission_id,
+                func.coalesce(func.sum(Evaluation.marks_obtained), 0).label("total"),
+                func.coalesce(func.sum(Evaluation.max_marks), 0).label("max_m")
+            )
+            .filter(Evaluation.submission_id.in_(sub_ids))
+            .group_by(Evaluation.submission_id)
+            .all()
+        )
+        eval_totals = {s_id: (float(tot), float(mx)) for s_id, tot, mx in sums}
+
     for sub, paper in rows:
-        total = db.query(func.sum(Evaluation.marks_obtained)).filter(
-            Evaluation.submission_id == sub.id
-        ).scalar() or 0
-        max_m = db.query(func.sum(Evaluation.max_marks)).filter(
-            Evaluation.submission_id == sub.id
-        ).scalar() or 1
+        total, max_m = eval_totals.get(sub.id, (0.0, 1.0))
         pct = round((float(total) / float(max_m)) * 100, 1) if max_m else 0
 
         entry = {
