@@ -27,6 +27,16 @@ class Subject(str, enum.Enum):
     ECONOMICS = "economics"             # Class 11-12
     ACCOUNTANCY = "accountancy"         # Class 11-12
     BUSINESS_STUDIES = "business_studies"  # Class 11-12
+    # Higher Education & Technical Disciplines
+    COMPUTER_SCIENCE = "computer_science"
+    DATA_STRUCTURES = "data_structures"
+    ENGINEERING = "engineering"
+    ELECTRONICS = "electronics"
+    MECHANICAL = "mechanical"
+    CIVIL = "civil"
+    MEDICINE = "medicine"
+    LAW = "law"
+    MANAGEMENT = "management"
     # General
     GENERAL = "general"
 
@@ -44,6 +54,16 @@ class ClassLevel(str, enum.Enum):
     G10   = "10"
     G11   = "11"
     G12   = "12"
+    # Higher Education / University
+    UG_1  = "ug_1"
+    UG_2  = "ug_2"
+    UG_3  = "ug_3"
+    UG_4  = "ug_4"
+    PG_1  = "pg_1"
+    PG_2  = "pg_2"
+    COMPETITIVE = "competitive"
+    PROFESSIONAL = "professional"
+    GENERAL = "general"
 
 
 class QuestionPaper(Base):
@@ -53,7 +73,8 @@ class QuestionPaper(Base):
     teacher_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     title = Column(String, nullable=False)
     subject = Column(Enum(Subject, values_callable=lambda x: [e.value for e in x]), nullable=False)
-    class_level = Column(String(10), default="12")
+    class_level = Column(String(20), default="12")
+    system_type = Column(String(50), default="general")
     total_marks = Column(Integer, nullable=False)
     duration_minutes = Column(Integer, nullable=False)
     instructions = Column(Text)

@@ -35,16 +35,26 @@ class EvaluationService:
         max_score: int = 10,
         diagram_info: dict = None,
         marking_scheme: dict = None,
-        rag_scores: List[float] = None
+        rag_scores: List[float] = None,
+        system_type: str = "general",
+        academic_level: str = None
     ) -> Dict:
-        """Evaluate student answer using Gemini API"""
+        """Evaluate student answer using Gemini API with universal support for any education system"""
         
-        logger.info(f"Evaluating {subject} Q (max: {max_score} marks)")
+        effective_level = academic_level or class_level
+        logger.info(f"Evaluating {subject} Q (max: {max_score} marks, system: {system_type}, level: {effective_level})")
         
         try:
             prompt = self._create_prompt(
-                question, student_answer, textbook_context,
-                subject, max_score, class_level, marking_scheme
+                question=question,
+                student_answer=student_answer,
+                textbook_context=textbook_context,
+                subject=subject,
+                max_score=max_score,
+                class_level=class_level,
+                marking_scheme=marking_scheme,
+                system_type=system_type,
+                academic_level=effective_level
             )
             response = self.client.models.generate_content(
                 model=self.model_name,
@@ -84,7 +94,9 @@ class EvaluationService:
             evaluation["metadata"] = {
                 "model": self.model_name,
                 "provider": "google",
-                "confidence": confidence
+                "confidence": confidence,
+                "system_type": system_type,
+                "academic_level": effective_level
             }
             
             logger.info(f"✅ Score: {evaluation['score']}/{max_score}, Confidence: {confidence:.2f}")
@@ -95,49 +107,98 @@ class EvaluationService:
             return self._create_fallback_evaluation(max_score, str(e))
     
     def _create_prompt(self, question, student_answer, textbook_context, 
-                      subject, max_score, class_level, marking_scheme):
-        """Create evaluation prompt"""
+                      subject, max_score, class_level, marking_scheme,
+                      system_type="general", academic_level=None):
+        """Create evaluation prompt adaptable to any education system, university, or examination board"""
         
-        correctness = int(max_score * 0.5)
-        completeness = int(max_score * 0.3)
-        understanding = max_score - correctness - completeness
+        correctness = round(max_score * 0.5, 1)
+        completeness = round(max_score * 0.3, 1)
+        understanding = round(max_score - correctness - completeness, 1)
         
+        level_str = str(academic_level or class_level or "General")
+        system_lower = str(system_type or "general").lower()
+        system_display = str(system_type or "General Academic").strip().title()
+        
+        # Adaptive persona and grading philosophy
+        if any(keyword in system_lower for keyword in ["university", "college", "higher_ed", "engineering", "undergraduate", "postgraduate"]):
+            evaluator_role = f"an expert University Professor and Examiner in {subject} (Academic Level: {level_str})"
+            grading_guidance = (
+                "Evaluate the student's response with university-level academic rigor. "
+                "Verify conceptual accuracy, technical precision, correct mathematical derivations/steps, "
+                "and valid professional terminology. Award fair partial credit for correct working steps."
+            )
+        elif any(keyword in system_lower for keyword in ["competitive", "gate", "gre", "upsc", "certification", "professional"]):
+            evaluator_role = f"a rigorous Senior Evaluator for competitive and professional examination standards in {subject}"
+            grading_guidance = (
+                "Evaluate with high precision. Check for analytical correctness, concise justifications, "
+                "proper formulas, and absence of flawed assumptions."
+            )
+        elif any(keyword in system_lower for keyword in ["cbse", "icse", "state_board", "cambridge", "ib", "k12", "school"]):
+            evaluator_role = f"an experienced and supportive {system_display} {subject} Teacher (Grade: {level_str})"
+            grading_guidance = (
+                "Evaluate supportively according to board curriculum standards. "
+                "Reward conceptual understanding and correct key terms with generous step marks."
+            )
+        else:
+            evaluator_role = f"an experienced and fair Academic Examiner in {subject} (Level: {level_str})"
+            grading_guidance = (
+                "Evaluate the student's answer fairly and constructively against the reference material and marking criteria. "
+                "Reward valid points and provide clear, actionable feedback for any gaps."
+            )
+
         marking_text = ""
         if marking_scheme:
-            marking_text = "\n\nMARKING SCHEME:\n"
+            marking_text = "\n\nOFFICIAL MARKING SCHEME / RUBRIC:\n"
             for item in marking_scheme.get("breakdown", []):
                 marking_text += f"- {item['point']} ({item['marks']} mark)\n"
             if "keywords" in marking_scheme:
-                marking_text += f"\nKeywords: {', '.join(marking_scheme['keywords'])}\n"
+                marking_text += f"\nRequired Technical Keywords: {', '.join(marking_scheme['keywords'])}\n"
         
-        return f"""You are a very lenient and supportive CBSE Class {class_level} {subject} teacher.
+        return f"""You are {evaluator_role}.
         
-Goal: Help the student succeed. If the student shows even a partial understanding or mentions relevant keywords, be generous with marks. 
+Evaluation Philosophy:
+{grading_guidance}
 
 QUESTION:
 {question}
 {marking_text}
 
-REFERENCE:
+CURRICULUM REFERENCE / REFERENCE MATERIAL:
 {textbook_context}
 
-STUDENT ANSWER:
+STUDENT SUBMITTED ANSWER:
 {student_answer}
 
-Evaluate and return ONLY valid JSON:
+Evaluate the student's response and return ONLY valid JSON matching this schema:
 
 {{
-  "score": <0-{max_score}>,
-  "score_breakdown": {{"correctness": <0-{correctness}>, "completeness": <0-{completeness}>, "understanding": <0-{understanding}>}},
-  "correct_points": ["What they got right"],
-  "errors": [{{"what": "mistake", "why": "reason", "impact": "minor reduction"}}],
-  "missing_concepts": ["Concepts to review"],
-  "correct_answer_should_include": ["Expected points"],
-  "improvement_guidance": [{{"suggestion": "Encouraging tip", "resource": "Chapter", "practice": "Exercise"}}],
-  "overall_feedback": "Helpful, lenient summary."
+  "score": <number between 0 and {max_score}>,
+  "score_breakdown": {{
+    "correctness": <0 to {correctness}>,
+    "completeness": <0 to {completeness}>,
+    "understanding": <0 to {understanding}>
+  }},
+  "correct_points": ["Specific points or steps the student solved or explained correctly"],
+  "errors": [
+    {{
+      "what": "Concise statement of the error or misconception",
+      "why": "Technical or conceptual explanation of why it is incorrect",
+      "impact": "Mark reduction impact"
+    }}
+  ],
+  "missing_concepts": ["Key concepts, formulas, or steps that should have been included"],
+  "correct_answer_should_include": ["Core expectations for a full-mark model answer"],
+  "improvement_guidance": [
+    {{
+      "suggestion": "Clear, actionable recommendation for improvement",
+      "resource": "Specific topic, chapter, or reference area to revise",
+      "practice": "Targeted problem type or exercise to practice"
+    }}
+  ],
+  "overall_feedback": "Constructive, objective summary of performance."
 }}
 
-Return ONLY the JSON, no other text."""
+Return ONLY the JSON, no markdown code fence, no additional prose."""
     
     def _parse_response(self, text: str, max_score: int) -> Dict:
         """Parse Gemini response"""

@@ -272,7 +272,9 @@ def process_submission_multiple(submission_id: str, image_paths: list, paper_id:
                     max_score=question.marks,
                     diagram_info=diagram_info,
                     marking_scheme=marking_scheme,
-                    rag_scores=rag_scores
+                    rag_scores=rag_scores,
+                    system_type=getattr(paper, "system_type", "general"),
+                    academic_level=str(paper.class_level)
                 )
             
             # Store evaluation
@@ -421,7 +423,9 @@ def process_submission(submission_id: str, image_path: str, paper_id: str, _old_
                 subject=paper.subject.value,
                 class_level=str(paper.class_level),
                 max_score=question.marks,
-                diagram_info=diagram_metadata if diagram_metadata.get("has_diagrams") else None
+                diagram_info=diagram_metadata if diagram_metadata.get("has_diagrams") else None,
+                system_type=getattr(paper, "system_type", "general"),
+                academic_level=str(paper.class_level)
             )
             
             # Store evaluation

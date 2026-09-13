@@ -12,12 +12,13 @@
 ## 1. PROJECT EXECUTIVE SUMMARY & CORE VALUE PROPOSITION
 
 ### Summary
-The **Context-Aware Automated Exam Grading System** is an end-to-end AI-powered educational evaluation platform designed to automate the grading of handwritten student answer scripts with high accuracy, curriculum alignment, and transparent feedback. Built specifically for secondary school (CBSE/Matriculation) standards, the system combines **Google Cloud Vision OCR** for digitizing handwritten text and formulas, **Qdrant Vector Database** with `all-mpnet-base-v2` embeddings for Retrieval-Augmented Generation (RAG), and **Google Gemini 1.5 Flash** for grounded LLM scoring and point-by-point error diagnostics (*what is wrong, why it is wrong, and score impact*).
+The **Context-Aware Automated Exam Grading System** is an end-to-end AI-powered educational evaluation platform designed to automate the grading of handwritten student answer scripts with high accuracy, curriculum alignment, and transparent feedback across **any educational system**—including Higher Education / Universities (Engineering, Computer Science, Sciences, Management), School Boards (CBSE, ICSE, Cambridge IB/IGCSE, State Boards), and Competitive / Professional Certification examinations. The system combines **Google Cloud Vision OCR** for digitizing handwritten text and formulas, **Qdrant Vector Database** with `all-mpnet-base-v2` embeddings for Retrieval-Augmented Generation (RAG), and **Google Gemini 1.5 Flash** for grounded LLM scoring and point-by-point error diagnostics (*what is wrong, why it is wrong, and score impact*).
 
 ### Problem Solved
-1. **Manual Correction Fatigue & Bias**: Replaces slow, subjective manual evaluation with deterministic, multi-criteria AI grading.
-2. **LLM Hallucinations**: Eliminates out-of-syllabus grading penalties by grounding LLM evaluation directly in retrieved textbook chapters and scoring rubrics.
-3. **Lack of Formative Feedback**: Moves beyond raw numerical scores by providing actionable diagnostic feedback for every evaluated question.
+1. **Universal System Adaptability**: Operates seamlessly across any educational board, university degree, or competitive exam through dynamic evaluator personas and rubric scaling.
+2. **Manual Correction Fatigue & Bias**: Replaces slow, subjective manual evaluation with deterministic, multi-criteria AI grading.
+3. **LLM Hallucinations**: Eliminates out-of-syllabus grading penalties by grounding LLM evaluation directly in retrieved textbook chapters and scoring rubrics.
+4. **Lack of Formative Feedback**: Moves beyond raw numerical scores by providing actionable diagnostic feedback for every evaluated question.
 
 ---
 

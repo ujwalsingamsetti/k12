@@ -26,6 +26,13 @@ def migrate():
             print("✓ Added pdf_path column to question_papers")
         except Exception as e:
             print(f"pdf_path column might already exist: {e}")
+
+        # Add system_type to question_papers table
+        try:
+            conn.execute(text("ALTER TABLE question_papers ADD COLUMN system_type VARCHAR(50) DEFAULT 'general'"))
+            print("✓ Added system_type column to question_papers")
+        except Exception as e:
+            print(f"system_type column might already exist: {e}")
         
         conn.commit()
         print("\n✅ Migration completed successfully!")

@@ -275,7 +275,15 @@ class QuestionPaperOCRService:
                                 break
 
                 defaults = CBSE_PHYSICS_SECTION_CONFIG.get(current_section, {})
-                fb_marks = CBSE_SECTION_MARKS_FALLBACK.get(current_section, 1)
+                section_clean = str(current_section).upper()
+                universal_defaults = {
+                    'A': 1, '1': 1, 'I': 2,
+                    'B': 2, '2': 5, 'II': 5,
+                    'C': 3, '3': 10, 'III': 10,
+                    'D': 4, '4': 15, 'IV': 15,
+                    'E': 5, '5': 20, 'V': 20,
+                }
+                fb_marks = defaults.get('marks_per_question') or universal_defaults.get(section_clean, 5)
 
                 section_cfg = {
                     'section': current_section,
@@ -486,17 +494,13 @@ class QuestionPaperOCRService:
             return 'long'
         return 'short'
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # Pattern helpers
-    # ─────────────────────────────────────────────────────────────────────────
-
     def _match_section_header(self, line: str) -> Optional[Dict]:
         """
-        Matches any of:
-          [SECTION – A]   SECTION-A   SECTION A   Section  A   sec-b
+        Matches universal section, part, unit, or module headers:
+          SECTION A, Part B, UNIT-I, Module 2, GROUP A, Section 1, etc.
         Returns {'section': 'A', 'marks_info': {...} or None}
         """
-        pat = r'[\[\(]?\s*SECTION\s*[-–—]?\s*([A-E])\s*[\]\)]?'
+        pat = r'[\[\(]?\s*(?:SECTION|PART|UNIT|MODULE|GROUP)\s*[-–—:]?\s*([A-Z0-9IVXLCDM]+)\s*[\]\)]?'
         m = re.search(pat, line, re.IGNORECASE)
         if not m:
             return None
@@ -506,15 +510,43 @@ class QuestionPaperOCRService:
         }
 
     def _extract_marks_info(self, line: str) -> Optional[Dict]:
-        """Parse NxM=T  (also NXM, N×M, with optional spaces)"""
-        pat = r'(\d+)\s*[xX×]\s*(\d+)\s*=\s*(\d+)'
-        m = re.search(pat, line)
-        if m:
+        """
+        Parse marks specifications in various academic formats:
+          - 16 x 1 = 16, 5 × 2 = 10, 2 * 10 = 20
+          - (10 Marks Each), [Each Question Carries 5 Marks]
+          - (Total: 50 Marks)
+        """
+        # Format 1: NxM=T
+        pat_nxm = r'(\d+)\s*[xX×*]\s*(\d+)\s*=\s*(\d+)'
+        m1 = re.search(pat_nxm, line)
+        if m1:
             return {
-                'num_questions': int(m.group(1)),
-                'marks_per_question': int(m.group(2)),
-                'total_marks': int(m.group(3)),
+                'num_questions': int(m1.group(1)),
+                'marks_per_question': int(m1.group(2)),
+                'total_marks': int(m1.group(3)),
             }
+        
+        # Format 2: "carries X marks", "X marks each", or "(X Marks Each)"
+        pat_each = r'(?:(?:carries\s+|each\s+carry\s+|each\s+)(\d+)\s*(?:marks?|m)\b|(\d+)\s*(?:marks?|m)\s+each)'
+        m2 = re.search(pat_each, line, re.IGNORECASE)
+        if m2:
+            val = m2.group(1) or m2.group(2)
+            return {
+                'num_questions': 99,
+                'marks_per_question': int(val),
+                'total_marks': None,
+            }
+
+        # Format 3: "[X Marks]" or "(X Marks Each)" inline with header
+        pat_bracket = r'[\[\(]\s*(\d+)\s*(?:marks?|mark|m)(?:\s+each)?\s*[\]\)]'
+        m3 = re.search(pat_bracket, line, re.IGNORECASE)
+        if m3:
+            return {
+                'num_questions': 99,
+                'marks_per_question': int(m3.group(1)),
+                'total_marks': None,
+            }
+
         return None
 
     def _match_question_start_line(self, line: str) -> Optional[Dict]:

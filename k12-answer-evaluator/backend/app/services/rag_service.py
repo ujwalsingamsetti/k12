@@ -55,7 +55,7 @@ class RAGService:
                 )
             ]
             
-            if class_level:
+            if class_level and class_level.lower() not in ["general", "any", "all", "none"]:
                 conditions.append(
                     FieldCondition(
                         key="class_level",
@@ -70,6 +70,16 @@ class RAGService:
                 query_filter=Filter(must=conditions),
                 limit=top_k * 2  # Get more for re-ranking
             ).points
+            
+            # Fallback to subject-only if level filter produced 0 results
+            if not search_result and len(conditions) > 1:
+                logger.info(f"No chunks with level={class_level}, falling back to subject-wide search")
+                search_result = self.qdrant_client.query_points(
+                    collection_name=settings.QDRANT_COLLECTION_NAME,
+                    query=query_vector,
+                    query_filter=Filter(must=[conditions[0]]),
+                    limit=top_k * 2
+                ).points
             
             # Re-rank results using keyword matching
             ranked_results = self._rerank_with_keywords(search_result, keywords)

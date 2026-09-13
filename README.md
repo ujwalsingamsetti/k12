@@ -1,19 +1,21 @@
-# K12 Answer Evaluator
+# Context-Aware Automated Exam Grading System
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Version](https://img.shields.io/badge/version-2.0.0-green.svg)
 ![Build](https://img.shields.io/badge/build-passing-brightgreen.svg)
 
 ## Overview
-The **K12 Answer Evaluator** is a cutting-edge educational platform designed to automate the evaluation of handwritten student answer sheets. It leverages Google Cloud Vision for OCR, Gemini AI for intelligent grading against an answer key, and an advanced Retrieval-Augmented Generation (RAG) system to query textbook content for accurate feedback. 
+The **Context-Aware Automated Exam Grading System** is an advanced educational evaluation platform designed to automate the grading of handwritten student answer sheets across **any educational system**—including Higher Education / Universities (Engineering, Sciences, Humanities), School Boards (CBSE, ICSE, Cambridge, State Boards), and Competitive / Professional Certification examinations.
 
-It provides two distinct portals:
-- **Teacher Portal:** Central hub to extract, create, and assign question papers. Gives teachers final authority to override AI evaluations.
-- **Student Portal:** A unified, glassmorphism-themed UI where students can upload handwritten answers, monitor tracking indicators, analyze subject-wise trends, and download detailed PDF report cards.
+It leverages Google Cloud Vision for OCR and layout parsing, Qdrant Vector Search for textbook-grounded Retrieval-Augmented Generation (RAG), and Gemini AI for multi-criteria grading against answer keys and course curricula with zero hallucinations.
 
-## Hackathon Criteria Fulfillment
-This project was built to directly address the K12 AI Evaluation Hackathon problem statement.
-*   **Target:** CBSE/Matriculation K12 education (configured via `class_level` and `subject`).
+It provides three specialized portals:
+- **Teacher / Examiner Portal:** Central hub to extract, create, and assign question papers across any subject or academic level. Gives educators full authority to review and override AI evaluations.
+- **Student Portal:** A unified, glassmorphism-themed UI where students upload handwritten answers, monitor tracking indicators, analyze performance trends, and download detailed PDF report cards.
+- **Parent Portal:** Dedicated transparency portal for monitoring academic progress.
+
+## Universal System Capabilities
+*   **Universal Compatibility:** Dynamically adapts evaluation personas, rubrics, and criteria for Universities (Undergraduate/Postgraduate), School Boards, and Competitive Exams.
 *   **What is wrong & Why it is wrong:** The AI parses `errors` into granular `[what, why, impact]` breakdowns.
 *   **Missing Concepts & Improvement:** Outputs `missing_concepts` and `improvement_guidance` to tell students exactly how to improve.
 *   **Correct Expected Answer:** Outputs `correct_answer_should_include` compared against the student's submission.
