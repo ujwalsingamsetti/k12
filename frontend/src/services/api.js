@@ -298,16 +298,22 @@ export const downloadSubmissionReport = async (submissionId, filename = null) =>
 };
 
 /* ─────────────────────────────────────────────────────────────────────────────
- * ASSET & DOWNLOAD HELPERS
+ * CORE EVALUATION STUDIO ENDPOINTS
  * ───────────────────────────────────────────────────────────────────────────── */
-export const getSubmissionImageUrl = (submissionId, page = 1, role = 'student') => {
-  const endpoint = role === 'parent' ? 'parent' : 'student';
-  return `${API_BASE_URL}/${endpoint}/submissions/${submissionId}/image?page=${page}`;
+export const getEvaluationPresets = () => api.get('/evaluation/presets');
+
+export const evaluateDirect = (formData, config = {}) => {
+  return api.post('/evaluation/evaluate', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+    ...config,
+  });
 };
 
-export const getQuestionPaperPdfUrl = (paperId) => {
-  return `${API_BASE_URL}/student/papers/${paperId}/pdf`;
-};
+export const overrideEvaluationScore = (data) => api.post('/evaluation/override', data);
+
+export const getSystemHealth = () => api.get('/health');
 
 export const downloadBlob = (blob, filename) => {
   if (typeof window === 'undefined') return;
