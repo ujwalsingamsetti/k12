@@ -14,6 +14,11 @@ class Settings(BaseSettings):
     
     # LLM Settings
     GEMINI_API_KEY: Optional[str] = None
+    GEMINI_MODEL: str = "gemini-1.5-flash"
+    LLM_PROVIDER: str = "deepseek"
+    DEEPSEEK_API_KEY: Optional[str] = None
+    DEEPSEEK_BASE_URL: str = "https://api.deepseek.com"
+    DEEPSEEK_MODEL: str = "deepseek-chat"
     OPENAI_API_KEY: str = "not-needed-for-local-llm"
     OPENAI_MODEL: str = "llama3.1:8b"
     OPENAI_BASE_URL: str = "http://localhost:11434/v1"
@@ -55,6 +60,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = True
+        extra = "allow"
     
     @property
     def allowed_extensions(self) -> list:

@@ -8,3 +8,5 @@ __pycache__/
 .env
 google-vision-credentials.json
 *.log
+qdrant_storage/
+data/qdrant_storage/

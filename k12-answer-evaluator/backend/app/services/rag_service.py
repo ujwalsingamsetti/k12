@@ -1,13 +1,12 @@
-import logging
+import os
 import asyncio
 from typing import List, Dict, Optional
 from collections import OrderedDict
+from loguru import logger
 from qdrant_client import QdrantClient
 from qdrant_client.models import Filter, FieldCondition, MatchValue
 from sentence_transformers import SentenceTransformer
 from app.config import settings
-
-logger = logging.getLogger(__name__)
 
 class RAGService:
     """High-performance RAG service for retrieving relevant textbook context with embedding caching"""
@@ -41,12 +40,37 @@ class RAGService:
     
     @property
     def qdrant_client(self) -> QdrantClient:
-        """Lazy-loaded Qdrant client with automatic connection reuse"""
+        """Lazy-loaded Qdrant client with automatic connection reuse and embedded fallback"""
         if self._qdrant_client is None:
-            self._qdrant_client = QdrantClient(
-                url=settings.QDRANT_URL,
-                api_key=settings.QDRANT_API_KEY
-            )
+            try:
+                self._qdrant_client = QdrantClient(
+                    url=settings.QDRANT_URL,
+                    api_key=settings.QDRANT_API_KEY,
+                    timeout=2.0
+                )
+                self._qdrant_client.get_collections()
+                logger.info(f"Connected to remote Qdrant at {settings.QDRANT_URL}")
+            except Exception as e:
+                storage_path = os.path.join(settings.DATA_DIR, "qdrant_storage")
+                os.makedirs(storage_path, exist_ok=True)
+                self._qdrant_client = QdrantClient(path=storage_path)
+                logger.info(f"Embedded local Qdrant initialized at {storage_path}")
+            
+            # Ensure collection exists
+            try:
+                if not self._qdrant_client.collection_exists(settings.QDRANT_COLLECTION_NAME):
+                    from qdrant_client.models import VectorParams, Distance
+                    self._qdrant_client.create_collection(
+                        collection_name=settings.QDRANT_COLLECTION_NAME,
+                        vectors_config=VectorParams(
+                            size=settings.QDRANT_VECTOR_SIZE,
+                            distance=Distance.COSINE
+                        )
+                    )
+                    logger.info(f"Created Qdrant collection: {settings.QDRANT_COLLECTION_NAME}")
+            except Exception as ce:
+                logger.debug(f"Collection check/creation note: {ce}")
+            
             self._ensure_payload_indexes()
         return self._qdrant_client
 

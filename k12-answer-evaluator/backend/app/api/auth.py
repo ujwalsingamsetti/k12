@@ -23,7 +23,7 @@ def register(request: Request, user: UserCreate, db: Session = Depends(get_db)):
     return crud_user.create_user(db=db, user=user)
 
 @router.post("/login", response_model=Token)
-@_limiter.limit("10/minute")
+@_limiter.limit("60/minute")
 def login(request: Request, user_login: UserLogin, db: Session = Depends(get_db)):
     user = crud_user.get_user_by_email(db, email=user_login.email)
     if not user or not verify_password(user_login.password, user.password_hash):
