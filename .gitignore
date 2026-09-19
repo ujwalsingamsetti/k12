@@ -1,0 +1,10 @@
+# Root .gitignore for project-k12
+.DS_Store
+*/.DS_Store
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.env
+google-vision-credentials.json
+*.log

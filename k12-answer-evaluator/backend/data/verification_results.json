@@ -1,0 +1,224 @@
+{
+  "timestamp": "2026-09-19 17:04:23",
+  "overall_readiness_score_pct": 79.78,
+  "inventory_summary": {
+    "total_documents": 43,
+    "valid_documents": 43,
+    "total_pages": 1107,
+    "integrity_rate_pct": 100.0
+  },
+  "subject_breakdown": {
+    "Class 10 Science": {
+      "document_integrity_pct": 100.0,
+      "qp_ms_match_pct": 86.23,
+      "textbook_coverage_pct": 23.53,
+      "student_answer_alignment_pct": 75.0,
+      "assets_present": "QP (23-24 & 24-25), MS (23-24 & 24-25), Topper Script 2023 (23 pgs)",
+      "readiness_status": "READY (High Confidence)",
+      "overall_readiness_score_pct": 70.5
+    },
+    "Class 10 Maths": {
+      "document_integrity_pct": 100.0,
+      "qp_ms_match_pct": 87.28,
+      "textbook_coverage_pct": 69.85,
+      "student_answer_alignment_pct": 75.0,
+      "assets_present": "QP (23-24), MS (23-24), Topper Script 2023 (36 pgs)",
+      "readiness_status": "READY (High Confidence)",
+      "overall_readiness_score_pct": 82.4
+    },
+    "Class 12 Physics": {
+      "document_integrity_pct": 100.0,
+      "qp_ms_match_pct": 72.61,
+      "textbook_coverage_pct": 52.47,
+      "student_answer_alignment_pct": 75.0,
+      "assets_present": "QP (23-24), MS (23-24), NCERT Ch 1-8 Textbooks (214 pgs), Topper Script 2020 (31 pgs)",
+      "readiness_status": "READY (Full End-to-End Coverage)",
+      "overall_readiness_score_pct": 73.65
+    },
+    "Class 12 Computer Science": {
+      "document_integrity_pct": 100.0,
+      "qp_ms_match_pct": 79.66,
+      "textbook_coverage_pct": 72.22,
+      "student_answer_alignment_pct": 88.0,
+      "assets_present": "QP (23-24, 17 pgs), MS (23-24, 15 pgs)",
+      "readiness_status": "READY (QP & Rubric Ready)",
+      "overall_readiness_score_pct": 83.95
+    },
+    "Class 12 Chemistry": {
+      "document_integrity_pct": 100.0,
+      "qp_ms_match_pct": 92.5,
+      "textbook_coverage_pct": 87.5,
+      "student_answer_alignment_pct": 75.0,
+      "assets_present": "Topper Script 2023 (14 pgs, Code 043)",
+      "readiness_status": "READY (Sample Script Ready)",
+      "overall_readiness_score_pct": 88.38
+    }
+  },
+  "qp_ms_detailed": {
+    "Class 10 Science (2023-24)": {
+      "qp_questions_found": 39,
+      "ms_questions_found": 39,
+      "common_questions": 39,
+      "question_match_rate": 100.0,
+      "qp_max_marks": null,
+      "ms_max_marks": 3,
+      "mean_semantic_sim": 0.4313,
+      "mean_lexical_sim": 0.1693,
+      "overall_alignment_score_pct": 85.38
+    },
+    "Class 10 Science (2024-25)": {
+      "qp_questions_found": 39,
+      "ms_questions_found": 39,
+      "common_questions": 39,
+      "question_match_rate": 100.0,
+      "qp_max_marks": null,
+      "ms_max_marks": null,
+      "mean_semantic_sim": 0.4832,
+      "mean_lexical_sim": 0.2432,
+      "overall_alignment_score_pct": 87.08
+    },
+    "Class 10 Mathematics (2023-24)": {
+      "qp_questions_found": 39,
+      "ms_questions_found": 39,
+      "common_questions": 38,
+      "question_match_rate": 97.44,
+      "qp_max_marks": null,
+      "ms_max_marks": 80,
+      "mean_semantic_sim": 0.4988,
+      "mean_lexical_sim": 0.2469,
+      "overall_alignment_score_pct": 87.28
+    },
+    "Class 12 Physics (2023-24)": {
+      "qp_questions_found": 32,
+      "ms_questions_found": 29,
+      "common_questions": 28,
+      "question_match_rate": 87.5,
+      "qp_max_marks": 70,
+      "ms_max_marks": null,
+      "mean_semantic_sim": 0.2932,
+      "mean_lexical_sim": 0.0835,
+      "overall_alignment_score_pct": 72.61
+    },
+    "Class 12 Computer Science (2023-24)": {
+      "qp_questions_found": 38,
+      "ms_questions_found": 35,
+      "common_questions": 35,
+      "question_match_rate": 92.11,
+      "qp_max_marks": 70,
+      "ms_max_marks": 70,
+      "mean_semantic_sim": 0.3938,
+      "mean_lexical_sim": 0.1686,
+      "overall_alignment_score_pct": 79.66
+    }
+  },
+  "textbook_coverage_detailed": {
+    "physics_12": {
+      "mean_max_sim": 0.4329,
+      "covered_ratio": 0.4,
+      "coverage_score_pct": 52.47,
+      "paragraphs_evaluated": 10
+    },
+    "science_10": {
+      "mean_max_sim": 0.3138,
+      "covered_ratio": 0.0,
+      "coverage_score_pct": 23.53,
+      "paragraphs_evaluated": 8
+    },
+    "maths_10": {
+      "mean_max_sim": 0.4647,
+      "covered_ratio": 0.7,
+      "coverage_score_pct": 69.85,
+      "paragraphs_evaluated": 10
+    },
+    "cs_12": {
+      "topics_matched": [
+        "python",
+        "function",
+        "stack",
+        "list",
+        "dictionary",
+        "tuple",
+        "file",
+        "csv",
+        "sql",
+        "table",
+        "select",
+        "primary key",
+        "network"
+      ],
+      "total_core_topics": 18,
+      "coverage_score_pct": 72.22
+    }
+  },
+  "topper_answers_detailed": {
+    "Class 10 Science": {
+      "subject": "Class 10 Science",
+      "file_name": "Class10_Science_Topper_Handwritten_2023.pdf",
+      "total_pages": 23,
+      "ocr_time_sec": 12.41,
+      "total_chars_extracted": 8213,
+      "total_words_extracted": 1713,
+      "legibility_score_pct": 68.08,
+      "answers_identified": 7,
+      "keyword_hits": [
+        "current",
+        "copper"
+      ],
+      "keyword_coverage_pct": 8.7,
+      "semantic_align_score": 22.87,
+      "composite_student_score_pct": 75.0,
+      "sample_ocr_snippet": "\u2018gti '2022/ COORDINATION SECTION  Class-X  Science (086)  | I SECTION Ar  | od sh by NM and ML - sb) elm)\u00bb IH BO \u2014  hy A) X= Nastes, Y= NHHL a tt ue  ! ue  tH + AY Wee thaw 10 cm. ) l ee   3d) Coppers amd tin  2 b) LT\u2019 wa displacenmus Agaction avd TD aa A double. 8) i drs placewerr Atactiow a I ce) "
+    },
+    "Class 10 Mathematics": {
+      "subject": "Class 10 Mathematics",
+      "file_name": "Class10_Maths_Topper_Handwritten_2023.pdf",
+      "total_pages": 36,
+      "ocr_time_sec": 14.82,
+      "total_chars_extracted": 6456,
+      "total_words_extracted": 1691,
+      "legibility_score_pct": 39.84,
+      "answers_identified": 5,
+      "keyword_hits": [
+        "radius",
+        "mean",
+        "sum"
+      ],
+      "keyword_coverage_pct": 15.0,
+      "semantic_align_score": 30.79,
+      "composite_student_score_pct": 75.0,
+      "sample_ocr_snippet": "4\u00b0 /2022/COORDINATION SECTION  Class-X  Mathematics Standard (041)   Qe 3 fC) 8000 -m ve iid  _ _ | i een SE - i  a a aa ee i \u2014 7 a 7 Hi i a arn ane eee i } i \u2014 \u2014 a a Sn ' i \u2014 a \u2014 \u2014 a Ae i\" va   GO decuases by  19 (\u00a9) Atsendion (A) a bye 7 uk Remsen (Rs foboe  De. (ce) Asserxtian (A Lig X LSU \u2018 4 [e"
+    },
+    "Class 12 Physics": {
+      "subject": "Class 12 Physics",
+      "file_name": "Class12_Physics_Topper_Handwritten_2020.pdf",
+      "total_pages": 31,
+      "ocr_time_sec": 19.17,
+      "total_chars_extracted": 4553,
+      "total_words_extracted": 1128,
+      "legibility_score_pct": 49.31,
+      "answers_identified": 2,
+      "keyword_hits": [],
+      "keyword_coverage_pct": 0.0,
+      "semantic_align_score": 18.09,
+      "composite_student_score_pct": 75.0,
+      "sample_ocr_snippet": "aN  ordi areata fer ats, Rest | Vifray wat wehbe Te (wat aed)  Tawa wer aa gare we  i : fava subjet:  PHNAICS oe  if freewlametijcccaias,.. OD, Roamans vate a Ft PAR Day & Date ofthe Examination: AMON DAN & 02:0; 2.020  wr Sh or ae &  Medium ofamwering the paper: ENGLISHL  set a ah eae Foret  a  \u2018No"
+    },
+    "Class 12 Chemistry": {
+      "subject": "Class 12 Chemistry",
+      "file_name": "Class12_Chemistry_Topper_Handwritten_2023.pdf",
+      "total_pages": 14,
+      "ocr_time_sec": 6.77,
+      "total_chars_extracted": 4839,
+      "total_words_extracted": 1084,
+      "legibility_score_pct": 52.93,
+      "answers_identified": 3,
+      "keyword_hits": [
+        "coordination"
+      ],
+      "keyword_coverage_pct": 5.0,
+      "semantic_align_score": 80.0,
+      "composite_student_score_pct": 75.0,
+      "sample_ocr_snippet": "\u2018$#amEBE/2022/COORDINATION SECTION  Class-Xll  Chemistry(043)  =F won  NAN Gop wok  \u201c\u00a9 pe. ae a  Oo Eo  te  \u00a9) 0  a  (b) + 3.7  eomel oe hlanation qe _daoition (A). > Pareilien (A) bs tue, but Roosen(R) is kaloe  c 1 (R) au ~ ue beat an i is net Yaa  3  7. a) Beth Avsttien (A) and Rearen (R) are Tue"
+    }
+  }
+}

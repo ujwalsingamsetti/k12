@@ -1,30 +1,106 @@
 import os
 import re
 import json
-import logging
-from typing import Dict, List
+from typing import Dict, List, Any
+from dotenv import load_dotenv
 from google import genai
 from google.genai import types
-from dotenv import load_dotenv
+from loguru import logger
 
 load_dotenv()
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 class EvaluationService:
-    """Gemini-based answer evaluation service (FREE tier)"""
+    """Multi-provider LLM answer evaluation service supporting DeepSeek and Google Gemini"""
     
     def __init__(self):
-        """Initialize the Gemini client using the new SDK"""
-        api_key = os.environ.get("GEMINI_API_KEY")
-        if not api_key:
-            raise ValueError("GEMINI_API_KEY not found in .env file. Get free key from https://aistudio.google.com/app/apikey")
+        """Initialize DeepSeek and Gemini clients based on environment configuration"""
+        self.provider = os.environ.get("LLM_PROVIDER", "deepseek").lower()
         
-        self.client = genai.Client(api_key=api_key)
-        # Default to Gemini 1.5 Flash for lowest latency, minimal cost, and high throughput
-        self.model_name = os.environ.get("GEMINI_MODEL", "gemini-1.5-flash")
-        logger.info(f"✅ Initialized GenAI client with {self.model_name}")
+        # 1. Initialize DeepSeek Client (OpenAI-compatible)
+        self.deepseek_api_key = os.environ.get("DEEPSEEK_API_KEY")
+        self.deepseek_base_url = os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
+        self.deepseek_model = os.environ.get("DEEPSEEK_MODEL", "deepseek-chat")
+        self.deepseek_client = None
+        self.deepseek_async_client = None
+        if self.deepseek_api_key:
+            try:
+                from openai import OpenAI, AsyncOpenAI
+                self.deepseek_client = OpenAI(api_key=self.deepseek_api_key, base_url=self.deepseek_base_url)
+                self.deepseek_async_client = AsyncOpenAI(api_key=self.deepseek_api_key, base_url=self.deepseek_base_url)
+                logger.info(f"✅ Initialized DeepSeek client with {self.deepseek_model}")
+            except Exception as e:
+                logger.warning(f"Failed to initialize DeepSeek client: {e}")
+
+        # 2. Initialize Google Gemini Client
+        self.gemini_api_key = os.environ.get("GEMINI_API_KEY")
+        self.gemini_model = os.environ.get("GEMINI_MODEL", "gemini-1.5-flash")
+        self.gemini_client = None
+        if self.gemini_api_key:
+            try:
+                self.gemini_client = genai.Client(api_key=self.gemini_api_key)
+                logger.info(f"✅ Initialized GenAI client with {self.gemini_model}")
+            except Exception as e:
+                logger.warning(f"Failed to initialize Gemini client: {e}")
+        
+        if not self.deepseek_client and not self.gemini_client:
+            raise ValueError("Neither DEEPSEEK_API_KEY nor GEMINI_API_KEY found in .env file.")
+        
+        logger.info(f"🚀 Active Primary LLM Provider: {self.provider.upper()}")
+
+    def _call_deepseek_sync(self, sys_instruction: str, user_prompt: str) -> str:
+        """Call DeepSeek API synchronously with structured JSON format"""
+        response = self.deepseek_client.chat.completions.create(
+            model=self.deepseek_model,
+            messages=[
+                {"role": "system", "content": sys_instruction},
+                {"role": "user", "content": user_prompt}
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.0
+        )
+        return response.choices[0].message.content
+
+    async def _call_deepseek_async(self, sys_instruction: str, user_prompt: str) -> str:
+        """Call DeepSeek API asynchronously with structured JSON format"""
+        response = await self.deepseek_async_client.chat.completions.create(
+            model=self.deepseek_model,
+            messages=[
+                {"role": "system", "content": sys_instruction},
+                {"role": "user", "content": user_prompt}
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.0
+        )
+        return response.choices[0].message.content
+
+    def _call_gemini_sync(self, sys_instruction: str, user_prompt: str) -> str:
+        """Call Gemini API synchronously with structured JSON format"""
+        response = self.gemini_client.models.generate_content(
+            model=self.gemini_model,
+            contents=user_prompt,
+            config=types.GenerateContentConfig(
+                system_instruction=sys_instruction,
+                response_mime_type="application/json",
+                temperature=0.2,
+                max_output_tokens=1024,
+            ),
+        )
+        return response.text
+
+    async def _call_gemini_async(self, sys_instruction: str, user_prompt: str) -> str:
+        """Call Gemini API asynchronously with structured JSON format"""
+        response = await self.gemini_client.aio.models.generate_content(
+            model=self.gemini_model,
+            contents=user_prompt,
+            config=types.GenerateContentConfig(
+                system_instruction=sys_instruction,
+                response_mime_type="application/json",
+                temperature=0.2,
+                max_output_tokens=1024,
+            ),
+        )
+        return response.text
     
     async def evaluate_answer_async(
         self,
@@ -40,9 +116,9 @@ class EvaluationService:
         system_type: str = "general",
         academic_level: str = None
     ) -> Dict:
-        """Asynchronously evaluate student answer using Gemini API (non-blocking)"""
+        """Asynchronously evaluate student answer with primary provider and fallback"""
         effective_level = academic_level or class_level
-        logger.info(f"[Async] Evaluating {subject} Q (max: {max_score} marks, model: {self.model_name}, level: {effective_level})")
+        logger.info(f"[Async] Evaluating {subject} Q (max: {max_score} marks, provider: {self.provider}, level: {effective_level})")
         
         try:
             sys_instruction = self._create_system_instruction(
@@ -59,24 +135,41 @@ class EvaluationService:
                 marking_scheme=marking_scheme
             )
             
-            response = await self.client.aio.models.generate_content(
-                model=self.model_name,
-                contents=user_prompt,
-                config=types.GenerateContentConfig(
-                    system_instruction=sys_instruction,
-                    response_mime_type="application/json",
-                    temperature=0.2,
-                    max_output_tokens=1024,
-                ),
-            )
-            raw_response = response.text
+            raw_response = None
+            provider_used = self.provider
+            model_used = self.deepseek_model if self.provider == "deepseek" else self.gemini_model
+
+            # Try primary provider (DeepSeek or Gemini)
+            if self.provider == "deepseek" and self.deepseek_async_client:
+                try:
+                    raw_response = await self._call_deepseek_async(sys_instruction, user_prompt)
+                except Exception as de:
+                    logger.warning(f"DeepSeek async failed ({de}), attempting Gemini fallback...")
+                    if self.gemini_client:
+                        raw_response = await self._call_gemini_async(sys_instruction, user_prompt)
+                        provider_used = "gemini"
+                        model_used = self.gemini_model
+                    else:
+                        raise de
+            elif self.gemini_client:
+                try:
+                    raw_response = await self._call_gemini_async(sys_instruction, user_prompt)
+                except Exception as ge:
+                    logger.warning(f"Gemini async failed ({ge}), attempting DeepSeek fallback...")
+                    if self.deepseek_async_client:
+                        raw_response = await self._call_deepseek_async(sys_instruction, user_prompt)
+                        provider_used = "deepseek"
+                        model_used = self.deepseek_model
+                    else:
+                        raise ge
+
             evaluation = self._parse_response(raw_response, max_score)
             return self._finalize_evaluation(
                 evaluation, student_answer, rag_scores, marking_scheme,
-                max_score, system_type, effective_level
+                max_score, system_type, effective_level, provider=provider_used, model=model_used
             )
         except Exception as e:
-            logger.error(f"❌ Gemini async evaluation failed: {e}")
+            logger.error(f"❌ Async evaluation failed: {e}")
             return self._create_fallback_evaluation(max_score, str(e))
 
     def evaluate_answer(
@@ -93,10 +186,9 @@ class EvaluationService:
         system_type: str = "general",
         academic_level: str = None
     ) -> Dict:
-        """Evaluate student answer using Gemini API with universal support for any education system"""
-        
+        """Evaluate student answer synchronously with primary provider and fallback"""
         effective_level = academic_level or class_level
-        logger.info(f"Evaluating {subject} Q (max: {max_score} marks, system: {system_type}, level: {effective_level})")
+        logger.info(f"Evaluating {subject} Q (max: {max_score} marks, provider: {self.provider}, level: {effective_level})")
         
         try:
             sys_instruction = self._create_system_instruction(
@@ -112,24 +204,41 @@ class EvaluationService:
                 textbook_context=textbook_context,
                 marking_scheme=marking_scheme
             )
-            response = self.client.models.generate_content(
-                model=self.model_name,
-                contents=user_prompt,
-                config=types.GenerateContentConfig(
-                    system_instruction=sys_instruction,
-                    response_mime_type="application/json",
-                    temperature=0.2,
-                    max_output_tokens=1024,
-                ),
-            )
-            raw_response = response.text
+
+            raw_response = None
+            provider_used = self.provider
+            model_used = self.deepseek_model if self.provider == "deepseek" else self.gemini_model
+
+            if self.provider == "deepseek" and self.deepseek_client:
+                try:
+                    raw_response = self._call_deepseek_sync(sys_instruction, user_prompt)
+                except Exception as de:
+                    logger.warning(f"DeepSeek sync failed ({de}), attempting Gemini fallback...")
+                    if self.gemini_client:
+                        raw_response = self._call_gemini_sync(sys_instruction, user_prompt)
+                        provider_used = "gemini"
+                        model_used = self.gemini_model
+                    else:
+                        raise de
+            elif self.gemini_client:
+                try:
+                    raw_response = self._call_gemini_sync(sys_instruction, user_prompt)
+                except Exception as ge:
+                    logger.warning(f"Gemini sync failed ({ge}), attempting DeepSeek fallback...")
+                    if self.deepseek_client:
+                        raw_response = self._call_deepseek_sync(sys_instruction, user_prompt)
+                        provider_used = "deepseek"
+                        model_used = self.deepseek_model
+                    else:
+                        raise ge
+
             evaluation = self._parse_response(raw_response, max_score)
             return self._finalize_evaluation(
                 evaluation, student_answer, rag_scores, marking_scheme,
-                max_score, system_type, effective_level
+                max_score, system_type, effective_level, provider=provider_used, model=model_used
             )
         except Exception as e:
-            logger.error(f"❌ Gemini evaluation failed: {e}")
+            logger.error(f"❌ Evaluation failed: {e}")
             return self._create_fallback_evaluation(max_score, str(e))
 
     def _finalize_evaluation(
@@ -137,10 +246,12 @@ class EvaluationService:
         evaluation: Dict,
         student_answer: str,
         rag_scores: List[float],
-        marking_scheme: dict,
+        marking_scheme: Any,
         max_score: int,
         system_type: str,
-        effective_level: str
+        effective_level: str,
+        provider: str = "deepseek",
+        model: str = "deepseek-chat"
     ) -> Dict:
         """Apply confidence calculation, leniency boost, and metadata packaging"""
         confidence = self._calculate_confidence(
@@ -167,8 +278,8 @@ class EvaluationService:
         
         evaluation["confidence"] = confidence
         evaluation["metadata"] = {
-            "model": self.model_name,
-            "provider": "google",
+            "model": model,
+            "provider": provider,
             "confidence": confidence,
             "system_type": system_type,
             "academic_level": effective_level
@@ -249,15 +360,20 @@ Output ONLY valid JSON matching this schema:
 Return ONLY valid JSON without markdown code fences or conversational prose."""
 
     def _create_user_prompt(self, question: str, student_answer: str, textbook_context: str, 
-                            marking_scheme: dict = None) -> str:
+                            marking_scheme: Any = None) -> str:
         """Create concise user prompt payload for minimal latency and token consumption"""
         marking_text = ""
         if marking_scheme:
-            breakdown = marking_scheme.get("breakdown", [])
-            if breakdown:
-                items = [f"- {item.get('point', '')} ({item.get('marks', '')} mark)" for item in breakdown]
-                marking_text += "\n\nOFFICIAL MARKING SCHEME / RUBRIC:\n" + "\n".join(items)
-            if "keywords" in marking_scheme and marking_scheme["keywords"]:
+            if isinstance(marking_scheme, dict):
+                breakdown = marking_scheme.get("breakdown", [])
+                if breakdown:
+                    items = [f"- {item.get('point', '')} ({item.get('marks', '')} mark)" for item in breakdown]
+                    marking_text += "\n\nOFFICIAL MARKING SCHEME / RUBRIC:\n" + "\n".join(items)
+                elif marking_scheme.get("rubric"):
+                    marking_text += f"\n\nOFFICIAL MARKING SCHEME / RUBRIC:\n{marking_scheme['rubric']}"
+            elif isinstance(marking_scheme, str) and marking_scheme.strip():
+                marking_text += f"\n\nOFFICIAL MARKING SCHEME / RUBRIC:\n{marking_scheme.strip()}"
+            if isinstance(marking_scheme, dict) and "keywords" in marking_scheme and marking_scheme["keywords"]:
                 marking_text += f"\nRequired Technical Keywords: {', '.join(marking_scheme['keywords'])}"
 
         parts = [f"QUESTION:\n{question.strip()}"]
@@ -323,7 +439,7 @@ Return ONLY valid JSON without markdown code fences or conversational prose."""
             factors.append(min(actual_len / expected_len, 1.0) * 0.2)
         
         # Keywords (20%)
-        if marking_scheme and 'keywords' in marking_scheme:
+        if marking_scheme and isinstance(marking_scheme, dict) and 'keywords' in marking_scheme:
             keywords = marking_scheme['keywords']
             answer_lower = student_answer.lower()
             found = sum(1 for kw in keywords if kw.lower() in answer_lower)
