@@ -1,4 +1,35 @@
 import React, { useState, useRef } from 'react';
+import {
+  Box,
+  Card,
+  CardContent,
+  Typography,
+  Grid,
+  Button,
+  IconButton,
+  Chip,
+  Tabs,
+  Tab,
+  TextField,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Stack,
+  Tooltip,
+} from '@mui/material';
+import {
+  CloudUpload as UploadIcon,
+  PhotoCamera as CameraIcon,
+  Create as PenIcon,
+  PictureAsPdf as PdfIcon,
+  Image as ImageIcon,
+  Close as CloseIcon,
+  ZoomIn as ZoomInIcon,
+  DeleteOutlined as DeleteIcon,
+  Visibility as ViewIcon,
+  Layers as PagesIcon,
+} from '@mui/icons-material';
 
 const AnswerUploadDropzone = ({
   files,
@@ -37,9 +68,10 @@ const AnswerUploadDropzone = ({
 
   const handleFilesAdded = (newFiles) => {
     const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'application/pdf'];
-    const filtered = newFiles.filter((f) => validTypes.includes(f.type) || f.name.match(/\.(png|jpe?g|webp|pdf)$/i));
-    
-    // Add object preview URLs for images
+    const filtered = newFiles.filter(
+      (f) => validTypes.includes(f.type) || f.name.match(/\.(png|jpe?g|webp|pdf)$/i)
+    );
+
     const withPreviews = filtered.map((f) => ({
       file: f,
       id: `${f.name}_${f.size}_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
@@ -60,221 +92,331 @@ const AnswerUploadDropzone = ({
     });
   };
 
+  const handleRemoveAll = () => {
+    files.forEach((f) => f.previewUrl && URL.revokeObjectURL(f.previewUrl));
+    setFiles([]);
+  };
+
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm transition-colors">
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-4 mb-4 border-b border-slate-100 dark:border-slate-800">
-        <div>
-          <h2 className="text-base font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
-            <span className="flex items-center justify-center w-6 h-6 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 text-xs font-black">
+    <Card elevation={1} sx={{ border: '1px solid #E2E8F0', borderRadius: 3, bgcolor: '#FFFFFF' }}>
+      <CardContent sx={{ p: 3 }}>
+        {/* Header with Step Indicator & Mode Switcher */}
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 2, pb: 2, mb: 2.5, borderBottom: '1px solid #F1F5F9' }}>
+          <Stack direction="row" alignItems="center" spacing={1.5}>
+            <Box
+              sx={{
+                width: 32,
+                height: 32,
+                borderRadius: 2,
+                bgcolor: '#ECFDF5',
+                color: '#059669',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 800,
+                fontSize: '0.875rem',
+                border: '1px solid #A7F3D0',
+              }}
+            >
               2
-            </span>
-            Student Answer Submission
-          </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Upload handwritten answer sheets (PNG, JPG, PDF) or provide typed text
-          </p>
-        </div>
+            </Box>
+            <Box>
+              <Stack direction="row" alignItems="center" spacing={1}>
+                <Typography variant="h6" sx={{ fontSize: '1rem', fontWeight: 700, color: '#0F172A' }}>
+                  Student Answer Submission
+                </Typography>
+                {files.length > 0 && (
+                  <Chip
+                    size="small"
+                    icon={<PagesIcon sx={{ fontSize: 14 }} />}
+                    label={`${files.length} Pages Attached`}
+                    sx={{ bgcolor: '#ECFDF5', color: '#059669', fontWeight: 700, border: '1px solid #6EE7B7' }}
+                  />
+                )}
+              </Stack>
+              <Typography variant="caption" sx={{ color: '#64748B', display: 'block' }}>
+                Upload handwritten answer sheet (PDF or images) or provide typed text
+              </Typography>
+            </Box>
+          </Stack>
 
-        {/* Input Mode Tabs */}
-        <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
-          <button
-            type="button"
-            onClick={() => setActiveTab('upload')}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-              activeTab === 'upload'
-                ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-            }`}
+          {/* Mode Switcher Tabs */}
+          <Tabs
+            value={activeTab}
+            onChange={(e, val) => setActiveTab(val)}
+            sx={{
+              minHeight: 38,
+              bgcolor: '#F1F5F9',
+              borderRadius: 2,
+              p: 0.5,
+              '& .MuiTabs-indicator': { display: 'none' },
+            }}
           >
-            📸 Handwritten Sheet {files.length > 0 && `(${files.length})`}
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('text')}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-              activeTab === 'text'
-                ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            ✍️ Typed Text
-          </button>
-        </div>
-      </div>
-
-      {activeTab === 'upload' ? (
-        <div className="space-y-4">
-          {/* Dropzone container */}
-          <div
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            onClick={() => fileInputRef.current && fileInputRef.current.click()}
-            className={`relative border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all ${
-              isDragging
-                ? 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/30 ring-4 ring-indigo-500/10'
-                : 'border-slate-300 dark:border-slate-700 hover:border-indigo-400 dark:hover:border-indigo-500 bg-slate-50/50 dark:bg-slate-800/30'
-            }`}
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              accept="image/png,image/jpeg,image/jpg,image/webp,application/pdf"
-              onChange={handleFileInputChange}
-              className="hidden"
+            <Tab
+              value="upload"
+              label={`Handwritten Sheets ${files.length > 0 ? `(${files.length})` : ''}`}
+              icon={<CameraIcon sx={{ fontSize: 16 }} />}
+              iconPosition="start"
+              sx={{
+                minHeight: 32,
+                py: 0.5,
+                px: 1.5,
+                fontSize: '0.75rem',
+                borderRadius: 1.5,
+                '&.Mui-selected': { bgcolor: '#FFFFFF', color: '#1E40AF', boxShadow: '0 1px 2px rgba(0,0,0,0.06)' },
+              }}
             />
-            <div className="flex flex-col items-center justify-center space-y-2">
-              <div className="w-12 h-12 rounded-2xl bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-300 flex items-center justify-center text-xl shadow-inner">
-                📄
-              </div>
-              <div>
-                <p className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                  Click to browse or drag & drop student answer sheet
-                </p>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                  Supported formats: High-res PNG, JPG, JPEG, WEBP, or multi-page PDF
-                </p>
-              </div>
-              <div className="flex items-center gap-3 pt-1 text-[10px] text-slate-400">
-                <span className="flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Gemini Vision OCR
-                </span>
-                <span className="flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span> Diagram Extraction
-                </span>
-                <span className="flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span> Auto-Deskew
-                </span>
-              </div>
-            </div>
-          </div>
+            <Tab
+              value="text"
+              label="Typed Text"
+              icon={<PenIcon sx={{ fontSize: 16 }} />}
+              iconPosition="start"
+              sx={{
+                minHeight: 32,
+                py: 0.5,
+                px: 1.5,
+                fontSize: '0.75rem',
+                borderRadius: 1.5,
+                '&.Mui-selected': { bgcolor: '#FFFFFF', color: '#1E40AF', boxShadow: '0 1px 2px rgba(0,0,0,0.06)' },
+              }}
+            />
+          </Tabs>
+        </Box>
 
-          {/* Uploaded files grid */}
-          {files.length > 0 && (
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                  Uploaded Answer Files ({files.length})
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    files.forEach((f) => f.previewUrl && URL.revokeObjectURL(f.previewUrl));
-                    setFiles([]);
+        {activeTab === 'upload' ? (
+          <Stack spacing={2.5}>
+            {/* Drag and Drop Zone */}
+            <Box
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current && fileInputRef.current.click()}
+              sx={{
+                p: 3.5,
+                borderRadius: 2.5,
+                border: '2px dashed',
+                borderColor: isDragging ? '#2563EB' : '#CBD5E1',
+                bgcolor: isDragging ? '#EFF6FF' : '#F8FAFC',
+                textAlign: 'center',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                '&:hover': {
+                  borderColor: '#3B82F6',
+                  bgcolor: '#F1F5F9',
+                },
+              }}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept="image/png,image/jpeg,image/jpg,image/webp,application/pdf"
+                onChange={handleFileInputChange}
+                style={{ display: 'none' }}
+              />
+
+              <Stack spacing={1.5} alignItems="center">
+                <Box
+                  sx={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: 3,
+                    bgcolor: '#EFF6FF',
+                    color: '#1E40AF',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                   }}
-                  className="text-[11px] text-rose-500 hover:text-rose-600 font-medium"
                 >
-                  Remove all
-                </button>
-              </div>
+                  <UploadIcon sx={{ fontSize: 28 }} />
+                </Box>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                {files.map((item, index) => (
-                  <div
-                    key={item.id}
-                    className="relative group rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/80 p-2 shadow-sm overflow-hidden flex flex-col justify-between"
+                <Box>
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: '#0F172A', mb: 0.5 }}>
+                    Click to browse or drag & drop student answer sheets
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: '#64748B', display: 'block' }}>
+                    Supports multi-page CBSE answer sheets (PDF, PNG, JPG, JPEG)
+                  </Typography>
+                </Box>
+
+                <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', justifyContent: 'center' }}>
+                  <Chip size="small" label="Gemini Vision OCR" sx={{ fontSize: '0.6875rem', bgcolor: '#FFFFFF', border: '1px solid #E2E8F0' }} />
+                  <Chip size="small" label="Auto Multi-Page Collation" sx={{ fontSize: '0.6875rem', bgcolor: '#FFFFFF', border: '1px solid #E2E8F0' }} />
+                  <Chip size="small" label="Handwriting Correction" sx={{ fontSize: '0.6875rem', bgcolor: '#FFFFFF', border: '1px solid #E2E8F0' }} />
+                </Stack>
+              </Stack>
+            </Box>
+
+            {/* Uploaded Files Gallery */}
+            {files.length > 0 && (
+              <Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Uploaded Answer Pages ({files.length})
+                  </Typography>
+                  <Button
+                    size="small"
+                    color="error"
+                    onClick={handleRemoveAll}
+                    sx={{ fontSize: '0.6875rem', fontWeight: 600, py: 0 }}
                   >
-                    {item.isPdf ? (
-                      <div className="h-24 w-full rounded-lg bg-rose-50 dark:bg-rose-950/40 flex flex-col items-center justify-center p-2 text-center">
-                        <span className="text-2xl mb-1">📑</span>
-                        <span className="text-[10px] font-bold text-rose-700 dark:text-rose-400 truncate w-full">
-                          PDF Document
-                        </span>
-                      </div>
-                    ) : (
-                      <div
-                        onClick={() => setPreviewModalUrl(item.previewUrl)}
-                        className="h-24 w-full rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-900 cursor-zoom-in relative"
-                      >
-                        <img
-                          src={item.previewUrl}
-                          alt={item.file.name}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                        />
-                        <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-xs font-medium">
-                          🔍 View
-                        </div>
-                      </div>
-                    )}
+                    Remove all
+                  </Button>
+                </Box>
 
-                    <div className="mt-2 flex items-center justify-between">
-                      <div className="truncate mr-1">
-                        <p className="text-[11px] font-semibold text-slate-800 dark:text-slate-200 truncate">
-                          P.{index + 1} {item.file.name}
-                        </p>
-                        <p className="text-[9px] text-slate-400">
-                          {(item.file.size / 1024).toFixed(0)} KB
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveFile(item.id)}
-                        className="w-5 h-5 rounded-full bg-slate-100 dark:bg-slate-700 hover:bg-rose-100 dark:hover:bg-rose-900/50 text-slate-400 hover:text-rose-600 flex items-center justify-center text-xs transition-colors shrink-0"
-                        title="Remove file"
+                <Grid container spacing={1.5}>
+                  {files.map((item, index) => (
+                    <Grid size={{ xs: 6, sm: 4, md: 3 }} key={item.id}>
+                      <Card
+                        elevation={0}
+                        sx={{
+                          border: '1px solid #E2E8F0',
+                          borderRadius: 2,
+                          overflow: 'hidden',
+                          bgcolor: '#FFFFFF',
+                          position: 'relative',
+                        }}
                       >
-                        ×
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      ) : (
-        <div>
-          <div className="flex items-center justify-between mb-1.5">
-            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-              Student Typed or Transcribed Answer Text
-            </label>
-            <span className="text-[10px] text-slate-400">
-              {answerText.trim().split(/\s+/).filter(Boolean).length} words
-            </span>
-          </div>
-          <textarea
-            rows={7}
-            value={answerText}
-            onChange={(e) => setAnswerText(e.target.value)}
-            placeholder="Type or paste student handwritten text here if not uploading images..."
-            className="w-full p-3.5 text-xs rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 leading-relaxed font-normal"
-          />
-        </div>
-      )}
+                        {item.isPdf ? (
+                          <Box
+                            sx={{
+                              height: 96,
+                              bgcolor: '#FEF2F2',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              p: 1.5,
+                            }}
+                          >
+                            <PdfIcon sx={{ fontSize: 32, color: '#DC2626', mb: 0.5 }} />
+                            <Typography variant="caption" sx={{ fontWeight: 700, color: '#991B1B', textAlign: 'center' }} noWrap>
+                              PDF Document
+                            </Typography>
+                          </Box>
+                        ) : (
+                          <Box
+                            onClick={() => setPreviewModalUrl(item.previewUrl)}
+                            sx={{
+                              height: 96,
+                              bgcolor: '#F8FAFC',
+                              cursor: 'zoom-in',
+                              position: 'relative',
+                              '&:hover .zoom-overlay': { opacity: 1 },
+                            }}
+                          >
+                            <img
+                              src={item.previewUrl}
+                              alt={item.file.name}
+                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            />
+                            <Box
+                              className="zoom-overlay"
+                              sx={{
+                                position: 'absolute',
+                                inset: 0,
+                                bgcolor: 'rgba(15, 23, 42, 0.4)',
+                                opacity: 0,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'opacity 0.2s',
+                                color: '#FFFFFF',
+                              }}
+                            >
+                              <ZoomInIcon sx={{ fontSize: 24 }} />
+                            </Box>
+                          </Box>
+                        )}
 
-      {/* Image Preview Lightbox Modal */}
-      {previewModalUrl && (
-        <div
-          onClick={() => setPreviewModalUrl(null)}
-          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm"
+                        <Box sx={{ p: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <Box sx={{ minWidth: 0, flex: 1, pr: 0.5 }}>
+                            <Typography variant="caption" sx={{ fontWeight: 700, color: '#0F172A', display: 'block' }} noWrap>
+                              P.{index + 1} {item.file.name}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: '#94A3B8', fontSize: '0.625rem' }}>
+                              {(item.file.size / 1024).toFixed(0)} KB
+                            </Typography>
+                          </Box>
+
+                          <IconButton
+                            size="small"
+                            onClick={() => handleRemoveFile(item.id)}
+                            sx={{ color: '#94A3B8', '&:hover': { color: '#DC2626' } }}
+                          >
+                            <CloseIcon sx={{ fontSize: 14 }} />
+                          </IconButton>
+                        </Box>
+                      </Card>
+                    </Grid>
+                  ))}
+                </Grid>
+              </Box>
+            )}
+          </Stack>
+        ) : (
+          /* Typed Answer Text View */
+          <Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+              <Typography variant="caption" sx={{ fontWeight: 600, color: '#475569' }}>
+                Student Transcribed / Typed Answer Text
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#94A3B8', fontFamily: 'monospace' }}>
+                {answerText.trim().split(/\s+/).filter(Boolean).length} words
+              </Typography>
+            </Box>
+
+            <TextField
+              fullWidth
+              multiline
+              rows={6}
+              placeholder="Paste or type student handwritten responses here if not uploading image scans..."
+              value={answerText}
+              onChange={(e) => setAnswerText(e.target.value)}
+              sx={{
+                '& .MuiInputBase-root': {
+                  fontSize: '0.8125rem',
+                  lineHeight: 1.6,
+                  bgcolor: '#F8FAFC',
+                },
+              }}
+            />
+          </Box>
+        )}
+
+        {/* Full Image Preview Modal */}
+        <Dialog
+          open={Boolean(previewModalUrl)}
+          onClose={() => setPreviewModalUrl(null)}
+          maxWidth="md"
+          fullWidth
         >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="relative max-w-4xl max-h-[90vh] bg-white dark:bg-slate-900 rounded-2xl overflow-hidden shadow-2xl flex flex-col"
-          >
-            <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-200 dark:border-slate-800">
-              <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                Answer Sheet Inspection
-              </span>
-              <button
-                type="button"
-                onClick={() => setPreviewModalUrl(null)}
-                className="text-xs px-2 py-1 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
-              >
-                ✕ Close
-              </button>
-            </div>
-            <div className="overflow-auto p-2 flex items-center justify-center max-h-[80vh]">
+          <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1.5 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+              Answer Sheet Inspection (High Resolution)
+            </Typography>
+            <IconButton size="small" onClick={() => setPreviewModalUrl(null)}>
+              <CloseIcon sx={{ fontSize: 18 }} />
+            </IconButton>
+          </DialogTitle>
+          <DialogContent dividers sx={{ p: 2, textAlign: 'center', bgcolor: '#F8FAFC' }}>
+            {previewModalUrl && (
               <img
                 src={previewModalUrl}
-                alt="Enlarged answer sheet scan"
-                className="max-w-full max-h-full object-contain rounded-lg shadow"
+                alt="Enlarged student answer sheet"
+                style={{ maxWidth: '100%', maxHeight: '75vh', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
               />
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+            )}
+          </DialogContent>
+          <DialogActions sx={{ px: 2, py: 1 }}>
+            <Button onClick={() => setPreviewModalUrl(null)} size="small">
+              Close
+            </Button>
+          </DialogActions>
+        </Dialog>
+      </CardContent>
+    </Card>
   );
 };
 

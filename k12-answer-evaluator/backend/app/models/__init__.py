@@ -7,6 +7,7 @@ from app.models.textbook import Textbook
 from app.models.assignment import StudentAssignment
 from app.models.section import Section, SectionMember
 from app.models.notification import Notification
+from app.models.saved_evaluation import SavedEvaluation
 
 __all__ = [
     "User", "UserRole",
@@ -18,4 +19,5 @@ __all__ = [
     "StudentAssignment",
     "Section", "SectionMember",
     "Notification",
+    "SavedEvaluation",
 ]

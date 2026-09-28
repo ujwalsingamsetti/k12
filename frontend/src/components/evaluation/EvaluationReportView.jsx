@@ -1,114 +1,514 @@
 import React, { useState } from 'react';
+import {
+  Box,
+  Card,
+  CardContent,
+  Paper,
+  Typography,
+  Grid,
+  Button,
+  IconButton,
+  Chip,
+  Tabs,
+  Tab,
+  TextField,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  LinearProgress,
+  CircularProgress,
+  Divider,
+  Alert,
+  AlertTitle,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+  ToggleButton,
+  ToggleButtonGroup,
+  Stack,
+  Tooltip,
+} from '@mui/material';
+import {
+  EmojiEvents as TrophyIcon,
+  CheckCircleOutlined as CheckIcon,
+  WarningAmber as WarningIcon,
+  ErrorOutlined as ErrorIcon,
+  AutoAwesome as SparklesIcon,
+  Psychology as BrainIcon,
+  FindInPage as SearchIcon,
+  Print as PrintIcon,
+  ContentCopy as CopyIcon,
+  Edit as EditIcon,
+  ExpandMore as ExpandMoreIcon,
+  School as SchoolIcon,
+  MenuBook as BookIcon,
+  Tune as FilterIcon,
+  Layers as PagesIcon,
+  AssignmentTurnedIn as RubricIcon,
+  Lightbulb as BulbIcon,
+  Bolt as BoltIcon,
+  Terminal as TerminalIcon,
+} from '@mui/icons-material';
 
 const EvaluationReportView = ({
   evaluation,
   isLoading,
   loadingStep,
+  realtimeStatus,
   onOverrideScore,
+  questionPaperTitle,
+  totalQuestions,
+  totalMarks,
+  subject,
+  academicLevel,
 }) => {
-  const [showExtractedText, setShowExtractedText] = useState(false);
+  const [selectedQuestionIndex, setSelectedQuestionIndex] = useState(0);
   const [showOverridePanel, setShowOverridePanel] = useState(false);
   const [overrideScoreVal, setOverrideScoreVal] = useState('');
   const [overrideNotesVal, setOverrideNotesVal] = useState('');
   const [isOverriding, setIsOverriding] = useState(false);
   const [copiedJson, setCopiedJson] = useState(false);
+  const [showFullRagTrace, setShowFullRagTrace] = useState(true);
+  const [showRawAnswerMap, setShowRawAnswerMap] = useState({});
+  const [showLiveLogs, setShowLiveLogs] = useState(false);
 
-  // Loading Screen
+  // ─────────────────────────────────────────────────────────────
+  // 1. LIVE RAG & EVALUATION PROGRESS LOADER
+  // ─────────────────────────────────────────────────────────────
   if (isLoading) {
-    const steps = [
-      { id: 1, label: 'Multimodal OCR & Formula Parsing', desc: 'Google Cloud Vision / Gemini 1.5 Flash' },
-      { id: 2, label: 'Curriculum RAG Context Retrieval', desc: 'SentenceTransformers + Qdrant Vector DB' },
-      { id: 3, label: 'Step-wise Rubric Reasoning & Grading', desc: 'DeepSeek API (deepseek-chat / DeepSeek-V3)' },
+    const activeProgress = typeof realtimeStatus?.progress === 'number' && realtimeStatus.progress > 0
+      ? realtimeStatus.progress
+      : Math.min(loadingStep * 20, 95);
+
+    const pipelineStages = [
+      { id: 1, key: 'ocr', title: 'Multimodal OCR & Handwriting Extraction', desc: 'Gemini Vision OCR transcription & diagram extraction' },
+      { id: 2, key: 'normalizing', title: 'LLM OCR Normalization & Multi-Page Collation', desc: 'Cleaning spelling/formatting and collating scattered answers across pages' },
+      { id: 3, key: 'rag', title: 'Targeted Vector Retrieval in Qdrant', desc: 'Querying textbook vectors strictly filtered by subject and class_level' },
+      { id: 4, key: 'evaluating', title: 'DeepSeek-V3 Step-wise Rubric Evaluation', desc: 'Parallel multi-criteria reasoning, misconception diagnosis & feedback' },
+      { id: 5, key: 'completed', title: 'Synthesis & Diagnostic Report Generation', desc: 'Compiling criteria breakdowns, remedial guidance & score telemetry' },
     ];
 
+    const currentStepNum = realtimeStatus?.step || loadingStep || 1;
+
     return (
-      <div className="bg-white dark:bg-slate-900 rounded-2xl p-8 border border-slate-200 dark:border-slate-800 shadow-sm transition-colors flex flex-col items-center justify-center min-h-[480px]">
-        <div className="relative w-20 h-20 mb-6 flex items-center justify-center">
-          <div className="absolute inset-0 rounded-full border-4 border-indigo-100 dark:border-indigo-950/80 animate-ping opacity-75"></div>
-          <div className="w-16 h-16 rounded-full border-4 border-indigo-600 border-t-transparent animate-spin"></div>
-          <span className="absolute text-xl">⚡</span>
-        </div>
-
-        <h3 className="text-base font-bold text-slate-900 dark:text-white text-center">
-          AI Evaluation In Progress
-        </h3>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 mb-8 text-center max-w-sm">
-          Analyzing handwriting, cross-referencing official rubrics, and evaluating conceptual mastery...
-        </p>
-
-        <div className="w-full max-w-md space-y-3">
-          {steps.map((step) => {
-            const isCurrent = loadingStep >= step.id;
-            return (
-              <div
-                key={step.id}
-                className={`p-3 rounded-xl border transition-all flex items-center gap-3 ${
-                  isCurrent
-                    ? 'border-indigo-200 dark:border-indigo-800 bg-indigo-50/50 dark:bg-indigo-950/30'
-                    : 'border-slate-100 dark:border-slate-800 opacity-40'
-                }`}
+      <Card elevation={1} sx={{ border: '1px solid #E2E8F0', borderRadius: 3, bgcolor: '#FFFFFF', minHeight: 480, p: 3 }}>
+        <CardContent sx={{ p: { xs: 2, md: 4 }, width: '100%', maxWidth: 640, mx: 'auto' }}>
+          <Stack spacing={3} sx={{ alignItems: 'center', textAlign: 'center' }}>
+            <Box sx={{ position: 'relative', display: 'inline-flex' }}>
+              <CircularProgress size={68} thickness={4} sx={{ color: '#1E40AF' }} />
+              <Box
+                sx={{
+                  top: 0,
+                  left: 0,
+                  bottom: 0,
+                  right: 0,
+                  position: 'absolute',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
               >
-                <div
-                  className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                    isCurrent
-                      ? 'bg-indigo-600 text-white shadow-sm'
-                      : 'bg-slate-200 dark:bg-slate-800 text-slate-500'
-                  }`}
+                <BrainIcon sx={{ color: '#1E40AF', fontSize: 30 }} />
+              </Box>
+            </Box>
+
+            <Box sx={{ width: '100%' }}>
+              <Stack direction="row" spacing={1} sx={{ justifyContent: 'center', alignItems: 'center', mb: 1 }}>
+                <Chip
+                  icon={<BoltIcon sx={{ fontSize: '1rem !important' }} />}
+                  label="REAL-TIME BACKEND STREAM"
+                  size="small"
+                  sx={{
+                    bgcolor: '#EFF6FF',
+                    color: '#1D4ED8',
+                    fontWeight: 800,
+                    fontSize: '0.6875rem',
+                    border: '1px solid #BFDBFE',
+                  }}
+                />
+                <Chip
+                  label={`${activeProgress}% COMPLETE`}
+                  size="small"
+                  sx={{
+                    bgcolor: '#F1F5F9',
+                    color: '#0F172A',
+                    fontWeight: 800,
+                    fontSize: '0.6875rem',
+                  }}
+                />
+              </Stack>
+
+              <Typography variant="h6" sx={{ fontWeight: 800, color: '#0F172A', mb: 0.5 }}>
+                {realtimeStatus?.title || 'AI Examination Pipeline Active'}
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#475569', minHeight: 40, px: 2 }}>
+                {realtimeStatus?.message || 'Executing multimodal OCR, answer collation, targeted Qdrant RAG, and DeepSeek grading...'}
+              </Typography>
+
+              {/* Live Smooth Progress Bar */}
+              <Box sx={{ width: '100%', mt: 2, px: 1 }}>
+                <LinearProgress
+                  variant="determinate"
+                  value={activeProgress}
+                  sx={{
+                    height: 8,
+                    borderRadius: 4,
+                    bgcolor: '#E2E8F0',
+                    '& .MuiLinearProgress-bar': {
+                      bgcolor: '#1E40AF',
+                      borderRadius: 4,
+                      transition: 'transform 0.4s ease',
+                    },
+                  }}
+                />
+              </Box>
+            </Box>
+
+            {/* Pipeline Stage Indicators */}
+            <Stack spacing={1.5} sx={{ width: '100%', textAlign: 'left' }}>
+              {pipelineStages.map((stage) => {
+                const isDone = currentStepNum > stage.id;
+                const isCurrent = currentStepNum === stage.id;
+                return (
+                  <Box
+                    key={stage.id}
+                    sx={{
+                      p: 1.5,
+                      borderRadius: 2,
+                      border: '1px solid',
+                      borderColor: isCurrent ? '#93C5FD' : isDone ? '#A7F3D0' : '#F1F5F9',
+                      bgcolor: isCurrent ? '#EFF6FF' : isDone ? '#ECFDF5' : '#F8FAFC',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1.5,
+                      opacity: isDone || isCurrent ? 1 : 0.45,
+                      transition: 'all 0.3s ease',
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        width: 26,
+                        height: 26,
+                        borderRadius: '50%',
+                        bgcolor: isDone ? '#059669' : isCurrent ? '#1E40AF' : '#E2E8F0',
+                        color: isDone || isCurrent ? '#FFFFFF' : '#64748B',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {isDone ? '✓' : stage.id}
+                    </Box>
+
+                    <Box sx={{ minWidth: 0, flex: 1 }}>
+                      <Typography variant="caption" sx={{ fontWeight: 700, color: '#0F172A', display: 'block' }} noWrap>
+                        {stage.title}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: '#64748B', fontSize: '0.6875rem', display: 'block' }} noWrap>
+                        {stage.desc}
+                      </Typography>
+                    </Box>
+
+                    {isCurrent && (
+                      <CircularProgress size={16} thickness={5} sx={{ color: '#1E40AF', flexShrink: 0 }} />
+                    )}
+                  </Box>
+                );
+              })}
+            </Stack>
+
+            {/* Real-time Streaming Event Log Drawer */}
+            {realtimeStatus?.logs && realtimeStatus.logs.length > 0 && (
+              <Box sx={{ width: '100%', mt: 1 }}>
+                <Button
+                  size="small"
+                  startIcon={<TerminalIcon fontSize="small" />}
+                  onClick={() => setShowLiveLogs((prev) => !prev)}
+                  sx={{ textTransform: 'none', color: '#64748B', fontSize: '0.75rem' }}
                 >
-                  {isCurrent ? '✓' : step.id}
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                    {step.label}
-                  </p>
-                  <p className="text-[10px] text-slate-500 dark:text-slate-400">
-                    {step.desc}
-                  </p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+                  {showLiveLogs ? 'Hide Live Telemetry Stream' : `View Live Telemetry Stream (${realtimeStatus.logs.length} events)`}
+                </Button>
+
+                {showLiveLogs && (
+                  <Box
+                    sx={{
+                      mt: 1.5,
+                      p: 2,
+                      bgcolor: '#0F172A',
+                      color: '#38BDF8',
+                      borderRadius: 2,
+                      fontFamily: 'monospace',
+                      fontSize: '0.75rem',
+                      maxHeight: 180,
+                      overflowY: 'auto',
+                      textAlign: 'left',
+                      border: '1px solid #1E293B',
+                    }}
+                  >
+                    {realtimeStatus.logs.map((logMsg, lIdx) => (
+                      <Box key={lIdx} sx={{ py: 0.25, borderBottom: '1px solid #1E293B', color: '#E2E8F0' }}>
+                        <Typography variant="inherit" sx={{ wordBreak: 'break-word' }}>
+                          {logMsg}
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Box>
+                )}
+              </Box>
+            )}
+          </Stack>
+        </CardContent>
+      </Card>
     );
   }
 
-  // Empty State (No evaluation performed yet)
+  // ─────────────────────────────────────────────────────────────
+  // 2. EMPTY STATE
+  // ─────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────
+  // 2. INITIAL STUDIO OVERVIEW STATE (Awaiting Evaluation)
+  // ─────────────────────────────────────────────────────────────
   if (!evaluation) {
     return (
-      <div className="bg-white dark:bg-slate-900 rounded-2xl p-10 border border-slate-200 dark:border-slate-800 shadow-sm transition-colors flex flex-col items-center justify-center min-h-[480px] text-center">
-        <div className="w-16 h-16 rounded-2xl bg-slate-100 dark:bg-slate-800/80 flex items-center justify-center text-3xl mb-4 shadow-inner">
-          🎯
-        </div>
-        <h3 className="text-base font-bold text-slate-900 dark:text-white">
-          Evaluation Report Studio
-        </h3>
-        <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mt-1 mb-6 leading-relaxed">
-          Configure an exam question, upload a handwritten answer sheet (or type the answer), and run AI Evaluation to inspect diagnostic criteria, misconceptions, and score breakdowns.
-        </p>
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/60 text-[11px] text-slate-600 dark:text-slate-400">
-          <span>💡 Tip:</span>
-          <span>Click <strong>Load Official Preset</strong> at the top to test verified examination assets instantly.</span>
-        </div>
-      </div>
+      <Card
+        elevation={0}
+        sx={{
+          border: '1px solid #CBD5E1',
+          borderRadius: 3,
+          bgcolor: '#FFFFFF',
+          minHeight: 520,
+          overflow: 'hidden',
+        }}
+      >
+        {/* Header */}
+        <Box
+          sx={{
+            p: 3,
+            borderBottom: '1px solid #F1F5F9',
+            background: 'linear-gradient(180deg, #F8FAFC 0%, #FFFFFF 100%)',
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1.5, mb: 1 }}>
+            <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+              <Box
+                sx={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 2.5,
+                  bgcolor: '#EFF6FF',
+                  color: '#1E40AF',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: '1px solid #BFDBFE',
+                }}
+              >
+                <SchoolIcon sx={{ fontSize: 22 }} />
+              </Box>
+              <Box>
+                <Typography variant="h6" sx={{ fontSize: '1.05rem', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.01em' }}>
+                  Examination Evaluation Studio
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600 }}>
+                  Autonomous K-12 Answer Evaluation & Pedagogical Diagnostic Engine
+                </Typography>
+              </Box>
+            </Stack>
+            <Chip
+              size="small"
+              label="Awaiting Evaluation"
+              sx={{
+                bgcolor: '#FEF3C7',
+                color: '#92400E',
+                border: '1px solid #FDE68A',
+                fontWeight: 700,
+                fontSize: '0.6875rem',
+              }}
+            />
+          </Box>
+        </Box>
+
+        <CardContent sx={{ p: 3 }}>
+          <Stack spacing={2.5}>
+            {/* Active Question Paper Summary */}
+            <Box
+              sx={{
+                p: 2,
+                borderRadius: 2.5,
+                bgcolor: '#F8FAFC',
+                border: '1px solid #E2E8F0',
+              }}
+            >
+              <Typography variant="caption" sx={{ fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', mb: 1 }}>
+                📋 Current Examination Paper Setup
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <Typography variant="caption" sx={{ color: '#64748B', display: 'block' }}>
+                    Paper Title:
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: '#1E40AF', noWrap: true }}>
+                    {questionPaperTitle || 'Science Examination Paper'}
+                  </Typography>
+                </Grid>
+                <Grid size={{ xs: 6, sm: 3 }}>
+                  <Typography variant="caption" sx={{ color: '#64748B', display: 'block' }}>
+                    Questions Configured:
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 800, color: '#0F172A' }}>
+                    {totalQuestions || 0} Questions
+                  </Typography>
+                </Grid>
+                <Grid size={{ xs: 6, sm: 3 }}>
+                  <Typography variant="caption" sx={{ color: '#64748B', display: 'block' }}>
+                    Total Max Marks:
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 800, color: '#059669' }}>
+                    {totalMarks || 0} Marks
+                  </Typography>
+                </Grid>
+              </Grid>
+            </Box>
+
+            {/* Evaluation Pipeline Overview */}
+            <Box>
+              <Typography variant="caption" sx={{ fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', mb: 1.5 }}>
+                ⚡ Automated Grading Pipeline
+              </Typography>
+              <Grid container spacing={1.5}>
+                <Grid size={{ xs: 12, md: 4 }}>
+                  <Box
+                    sx={{
+                      p: 1.75,
+                      borderRadius: 2,
+                      bgcolor: '#EFF6FF',
+                      border: '1px solid #DBEAFE',
+                      height: '100%',
+                    }}
+                  >
+                    <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 0.75 }}>
+                      <SparklesIcon sx={{ fontSize: 18, color: '#2563EB' }} />
+                      <Typography variant="subtitle2" sx={{ fontSize: '0.8125rem', fontWeight: 700, color: '#1E40AF' }}>
+                        1. Multimodal OCR
+                      </Typography>
+                    </Stack>
+                    <Typography variant="caption" sx={{ color: '#475569', lineHeight: 1.5, display: 'block' }}>
+                      Transcribes handwritten answers, preserves formulas, and normalizes student text.
+                    </Typography>
+                  </Box>
+                </Grid>
+
+                <Grid size={{ xs: 12, md: 4 }}>
+                  <Box
+                    sx={{
+                      p: 1.75,
+                      borderRadius: 2,
+                      bgcolor: '#EEF2FF',
+                      border: '1px solid #E0E7FF',
+                      height: '100%',
+                    }}
+                  >
+                    <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 0.75 }}>
+                      <BrainIcon sx={{ fontSize: 18, color: '#4F46E5' }} />
+                      <Typography variant="subtitle2" sx={{ fontSize: '0.8125rem', fontWeight: 700, color: '#3730A3' }}>
+                        2. Qdrant RAG
+                      </Typography>
+                    </Stack>
+                    <Typography variant="caption" sx={{ color: '#475569', lineHeight: 1.5, display: 'block' }}>
+                      Grounds evaluation with official textbook curriculum modules & knowledge graphs.
+                    </Typography>
+                  </Box>
+                </Grid>
+
+                <Grid size={{ xs: 12, md: 4 }}>
+                  <Box
+                    sx={{
+                      p: 1.75,
+                      borderRadius: 2,
+                      bgcolor: '#ECFDF5',
+                      border: '1px solid #D1FAE5',
+                      height: '100%',
+                    }}
+                  >
+                    <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 0.75 }}>
+                      <RubricIcon sx={{ fontSize: 18, color: '#059669' }} />
+                      <Typography variant="subtitle2" sx={{ fontSize: '0.8125rem', fontWeight: 700, color: '#065F46' }}>
+                        3. DeepSeek Scoring
+                      </Typography>
+                    </Stack>
+                    <Typography variant="caption" sx={{ color: '#475569', lineHeight: 1.5, display: 'block' }}>
+                      Step-wise rubric grading, marks allocation, and misconception identification.
+                    </Typography>
+                  </Box>
+                </Grid>
+              </Grid>
+            </Box>
+
+            {/* Instruction Banner */}
+            <Alert
+              severity="info"
+              icon={<BoltIcon sx={{ color: '#2563EB' }} />}
+              sx={{
+                borderRadius: 2.5,
+                bgcolor: '#EFF6FF',
+                border: '1px solid #BFDBFE',
+                '& .MuiAlert-message': { fontSize: '0.8125rem', color: '#1E40AF', lineHeight: 1.6 },
+              }}
+            >
+              <strong>Ready for Evaluation:</strong> Upload the student's handwritten answer sheet in <strong>Stage 2 (Upload)</strong> or enter sample answer text, then click <strong>"Run AI Examination Evaluation"</strong> below. Real-time pipeline telemetry and the complete diagnostic report will appear here.
+            </Alert>
+          </Stack>
+        </CardContent>
+      </Card>
     );
   }
+
+  // Multi-Question vs Single Question data resolution
+  const questionsList = evaluation.questions && evaluation.questions.length > 0
+    ? evaluation.questions
+    : [
+        {
+          question_number: 1,
+          question_text: evaluation.overall_feedback || 'Question 1',
+          marking_scheme: 'Standard Rubric',
+          max_score: evaluation.max_score || evaluation.total_max_score || 2.0,
+          score: evaluation.score || evaluation.total_score || 0.0,
+          percentage: evaluation.percentage || 0.0,
+          status: evaluation.status || 'PASS',
+          breakdown: evaluation.breakdown || {},
+          correct_points: evaluation.correct_points || [],
+          misconceptions: evaluation.misconceptions || [],
+          missing_concepts: evaluation.missing_concepts || [],
+          improvement_guidance: evaluation.improvement_guidance || [],
+          overall_feedback: evaluation.overall_feedback || '',
+          student_answer_text: evaluation.extracted_text || '',
+          rag_trace: evaluation.rag_trace || null,
+        },
+      ];
+
+  const activeQ = questionsList[selectedQuestionIndex] || questionsList[0];
+  const activeRagTrace = activeQ.rag_trace || evaluation.rag_trace || null;
 
   // Handle Score Override Submit
   const handleApplyOverride = async (e) => {
     e.preventDefault();
     const parsed = parseFloat(overrideScoreVal);
-    if (isNaN(parsed) || parsed < 0 || parsed > evaluation.max_score) {
-      alert(`Score must be a number between 0 and ${evaluation.max_score}`);
+    if (isNaN(parsed) || parsed < 0 || parsed > activeQ.max_score) {
+      alert(`Score must be a number between 0 and ${activeQ.max_score}`);
       return;
     }
     setIsOverriding(true);
     try {
       await onOverrideScore({
         evaluation_id: evaluation.evaluation_id,
+        question_number: activeQ.question_number,
         adjusted_score: parsed,
-        max_score: evaluation.max_score,
-        examiner_notes: overrideNotesVal || 'Manual examiner adjustment applied.',
+        max_score: activeQ.max_score,
+        examiner_notes: overrideNotesVal || `Manual adjustment on Q${activeQ.question_number}`,
       });
       setShowOverridePanel(false);
     } catch (err) {
@@ -118,377 +518,676 @@ const EvaluationReportView = ({
     }
   };
 
-  // Copy JSON Export
   const handleCopyJson = () => {
     navigator.clipboard.writeText(JSON.stringify(evaluation, null, 2));
     setCopiedJson(true);
     setTimeout(() => setCopiedJson(false), 2000);
   };
 
-  // Status Color Logic
   const getStatusBadge = (status, pct) => {
     if (pct >= 80 || status === 'EXEMPLARY') {
       return {
-        bg: 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60',
+        color: 'success',
         label: 'Exemplary Mastery',
       };
     }
     if (pct >= 50 || status === 'PASS') {
       return {
-        bg: 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800/60',
+        color: 'primary',
         label: 'Passed / Competent',
       };
     }
     if (pct >= 30 || status === 'NEEDS_IMPROVEMENT') {
       return {
-        bg: 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800/60',
-        label: 'Needs Conceptual Revision',
+        color: 'warning',
+        label: 'Needs Revision',
       };
     }
     return {
-      bg: 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800/60',
+      color: 'error',
       label: 'Below Passing Standard',
     };
   };
 
-  const statusBadge = getStatusBadge(evaluation.status, evaluation.percentage);
-  const bd = evaluation.breakdown || {};
+  const paperStatus = getStatusBadge(evaluation.status, evaluation.percentage);
+  const qStatus = getStatusBadge(activeQ.status, activeQ.percentage);
+  const qbd = activeQ.breakdown || {};
 
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm transition-colors space-y-6">
-      {/* Top Header Card */}
-      <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
-        <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-base font-bold text-slate-900 dark:text-white">
-              AI Evaluation Report
-            </h2>
-            <span
-              className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${statusBadge.bg}`}
+    <Card elevation={1} sx={{ border: '1px solid #E2E8F0', borderRadius: 3, bgcolor: '#FFFFFF' }}>
+      <CardContent sx={{ p: 3 }}>
+        <Stack spacing={2.5}>
+          {/* ─────────────────────────────────────────────────────────
+           * A. EXAM PAPER OVERVIEW HERO
+           * ───────────────────────────────────────────────────────── */}
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2.5,
+              borderRadius: 2.5,
+              bgcolor: '#F8FAFC',
+              border: '1px solid #E2E8F0',
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 2,
+            }}
+          >
+            <Box>
+              <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 0.5 }}>
+                <Typography variant="h6" sx={{ fontSize: '1.05rem', fontWeight: 800, color: '#0F172A' }}>
+                  Exam Paper Evaluation
+                </Typography>
+                <Chip
+                  size="small"
+                  label={paperStatus.label}
+                  color={paperStatus.color}
+                  sx={{ fontWeight: 700, fontSize: '0.6875rem' }}
+                />
+              </Stack>
+              <Typography variant="caption" sx={{ color: '#64748B', display: 'block' }}>
+                {questionsList.length} Questions Evaluated • DeepSeek-V3 Reasoning • Qdrant RAG Grounded
+              </Typography>
+            </Box>
+
+            {/* Total Paper Score Box */}
+            <Stack direction="row" spacing={2.5} sx={{ alignItems: 'center' }}>
+              <Box sx={{ textAlign: 'right' }}>
+                <Typography variant="caption" sx={{ fontWeight: 700, textTransform: 'uppercase', color: '#94A3B8', display: 'block' }}>
+                  Total Paper Score
+                </Typography>
+                <Stack direction="row" spacing={0.5} sx={{ alignItems: 'baseline', justifyContent: 'flex-end' }}>
+                  <Typography variant="h4" sx={{ fontWeight: 900, color: '#1E40AF', fontFamily: 'monospace' }}>
+                    {evaluation.total_score ?? evaluation.score}
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: '#64748B', fontFamily: 'monospace' }}>
+                    / {evaluation.total_max_score ?? evaluation.max_score} pts
+                  </Typography>
+                </Stack>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: '#059669' }}>
+                  {evaluation.percentage}% Overall
+                </Typography>
+              </Box>
+
+              <Stack direction="column" spacing={0.75} sx={{ pl: 2, borderLeft: '1px solid #E2E8F0' }}>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={handleCopyJson}
+                  startIcon={<CopyIcon sx={{ fontSize: 14 }} />}
+                  sx={{ fontSize: '0.6875rem', py: 0.25, px: 1, color: '#475569', borderColor: '#CBD5E1' }}
+                >
+                  {copiedJson ? 'Copied' : 'JSON'}
+                </Button>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={() => window.print()}
+                  startIcon={<PrintIcon sx={{ fontSize: 14 }} />}
+                  sx={{ fontSize: '0.6875rem', py: 0.25, px: 1, color: '#475569', borderColor: '#CBD5E1' }}
+                >
+                  Print
+                </Button>
+              </Stack>
+            </Stack>
+          </Paper>
+
+          {/* OCR Normalization & Multi-Page Collation Summary Banner */}
+          {evaluation.ocr_cleaning_summary && (
+            <Alert
+              severity="info"
+              icon={<SparklesIcon sx={{ color: '#4F46E5' }} />}
+              sx={{
+                bgcolor: '#EEF2FF',
+                border: '1px solid #C7D2FE',
+                borderRadius: 2,
+                '& .MuiAlert-message': { width: '100%' },
+              }}
             >
-              {statusBadge.label}
-            </span>
-          </div>
-          <p className="text-[11px] text-slate-400 mt-0.5 font-mono">
-            ID: {evaluation.evaluation_id?.slice(0, 8)} • Model: {evaluation.model || 'deepseek-chat'} ({evaluation.provider || 'deepseek'})
-          </p>
-        </div>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+                <Typography variant="caption" sx={{ fontWeight: 800, color: '#312E81', textTransform: 'uppercase' }}>
+                  LLM OCR Normalization & Multi-Page Collation
+                </Typography>
+                <Chip
+                  size="small"
+                  icon={<PagesIcon sx={{ fontSize: 12 }} />}
+                  label={`${evaluation.pages_processed || 1} Pages Processed`}
+                  sx={{ height: 20, fontSize: '0.6875rem', bgcolor: '#E0E7FF', color: '#3730A3', fontWeight: 700 }}
+                />
+              </Box>
+              <Typography variant="body2" sx={{ fontSize: '0.75rem', color: '#4338CA', lineHeight: 1.5 }}>
+                {evaluation.ocr_cleaning_summary}
+              </Typography>
+            </Alert>
+          )}
 
-        {/* Action buttons */}
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleCopyJson}
-            className="text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-all font-medium"
+          {/* ─────────────────────────────────────────────────────────
+           * B. QUESTION NAVIGATOR (PILLS)
+           * ───────────────────────────────────────────────────────── */}
+          <Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+              <Typography variant="caption" sx={{ fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Question Breakdown Navigator
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#94A3B8' }}>
+                Select to inspect criteria, misconceptions & RAG grounding
+              </Typography>
+            </Box>
+
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, overflowX: 'auto', pb: 0.5 }}>
+              {questionsList.map((q, idx) => {
+                const isSel = idx === selectedQuestionIndex;
+                const qPct = q.percentage || 0;
+                return (
+                  <Button
+                    key={idx}
+                    variant={isSel ? 'contained' : 'outlined'}
+                    color={isSel ? 'primary' : 'inherit'}
+                    size="small"
+                    onClick={() => {
+                      setSelectedQuestionIndex(idx);
+                      setShowOverridePanel(false);
+                    }}
+                    sx={{
+                      minWidth: 100,
+                      py: 0.5,
+                      px: 1.5,
+                      borderRadius: 2,
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      borderColor: isSel ? 'primary.main' : '#E2E8F0',
+                      bgcolor: isSel ? '#1E40AF' : '#F8FAFC',
+                      color: isSel ? '#FFFFFF' : '#334155',
+                    }}
+                  >
+                    Q#{q.question_number || idx + 1}
+                    <Chip
+                      size="small"
+                      label={`${q.score}/${q.max_score}m`}
+                      sx={{
+                        ml: 0.75,
+                        height: 18,
+                        fontSize: '0.6875rem',
+                        fontWeight: 700,
+                        bgcolor: isSel ? 'rgba(255,255,255,0.2)' : qPct >= 80 ? '#D1FAE5' : qPct >= 50 ? '#DBEAFE' : '#FEF3C7',
+                        color: isSel ? '#FFFFFF' : qPct >= 80 ? '#065F46' : qPct >= 50 ? '#1E40AF' : '#92400E',
+                      }}
+                    />
+                  </Button>
+                );
+              })}
+            </Box>
+          </Box>
+
+          {/* ─────────────────────────────────────────────────────────
+           * C. ACTIVE QUESTION DETAILS CARD
+           * ───────────────────────────────────────────────────────── */}
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2.5,
+              borderRadius: 2.5,
+              bgcolor: '#FFFFFF',
+              border: '1px solid #CBD5E1',
+            }}
           >
-            {copiedJson ? '✓ Copied JSON' : '📋 Copy JSON'}
-          </button>
-          <button
-            type="button"
-            onClick={() => window.print()}
-            className="text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-all font-medium"
-          >
-            🖨️ Print
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowOverridePanel(!showOverridePanel)}
-            className="text-xs px-3 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 font-semibold border border-indigo-200 dark:border-indigo-800 transition-all"
-          >
-            ✏️ Examiner Override
-          </button>
-        </div>
-      </div>
+            <Stack spacing={2}>
+              {/* Question Header & Examiner Override */}
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 1.5, pb: 1.5, borderBottom: '1px solid #F1F5F9' }}>
+                <Box>
+                  <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#0F172A', textTransform: 'uppercase' }}>
+                      Question #{activeQ.question_number} Diagnostic Report
+                    </Typography>
+                    <Chip
+                      size="small"
+                      label={`${activeQ.score}/${activeQ.max_score} Marks (${activeQ.percentage}%)`}
+                      color={qStatus.color}
+                      sx={{ fontWeight: 700, fontSize: '0.6875rem' }}
+                    />
+                  </Stack>
+                  <Typography variant="body2" sx={{ color: '#475569', mt: 0.5, fontStyle: 'italic', fontSize: '0.8125rem' }}>
+                    "{activeQ.question_text}"
+                  </Typography>
+                </Box>
 
-      {/* Examiner Override Form (Collapsible) */}
-      {showOverridePanel && (
-        <form
-          onSubmit={handleApplyOverride}
-          className="p-4 rounded-xl bg-amber-50/60 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 space-y-3 transition-all"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-amber-900 dark:text-amber-200">
-              Manual Examiner Score Adjustment
-            </span>
-            <button
-              type="button"
-              onClick={() => setShowOverridePanel(false)}
-              className="text-xs text-amber-700 dark:text-amber-300 hover:underline"
-            >
-              Cancel
-            </button>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Adjusted Score (Max: {evaluation.max_score})
-              </label>
-              <input
-                type="number"
-                step="0.5"
-                min="0"
-                max={evaluation.max_score}
-                required
-                placeholder={evaluation.score.toString()}
-                value={overrideScoreVal}
-                onChange={(e) => setOverrideScoreVal(e.target.value)}
-                className="w-full px-3 py-1.5 text-xs rounded-lg bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-700 text-slate-900 dark:text-white font-mono font-bold focus:outline-none focus:ring-2 focus:ring-amber-500"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Examiner Remarks / Rationale
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. Awarded partial credit for derivation steps..."
-                value={overrideNotesVal}
-                onChange={(e) => setOverrideNotesVal(e.target.value)}
-                className="w-full px-3 py-1.5 text-xs rounded-lg bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
-              />
-            </div>
-          </div>
-          <button
-            type="submit"
-            disabled={isOverriding}
-            className="px-4 py-1.5 text-xs font-bold rounded-lg bg-amber-600 hover:bg-amber-700 text-white shadow-sm transition-all"
-          >
-            {isOverriding ? 'Saving...' : 'Apply Adjusted Score'}
-          </button>
-        </form>
-      )}
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color="warning"
+                  onClick={() => setShowOverridePanel(!showOverridePanel)}
+                  startIcon={<EditIcon sx={{ fontSize: 14 }} />}
+                  sx={{ fontSize: '0.6875rem', fontWeight: 700 }}
+                >
+                  Override Marks
+                </Button>
+              </Box>
 
-      {/* Score Hero & Criteria Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        {/* Main Score Card */}
-        <div className="sm:col-span-1 bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-950/40 dark:to-purple-950/30 rounded-2xl p-4 border border-indigo-100 dark:border-indigo-900/50 flex flex-col justify-center items-center text-center">
-          <span className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
-            Total Score
-          </span>
-          <div className="mt-1 flex items-baseline gap-1">
-            <span className="text-3xl font-black text-slate-900 dark:text-white font-mono">
-              {evaluation.score}
-            </span>
-            <span className="text-xs text-slate-400 font-mono">
-              / {evaluation.max_score}
-            </span>
-          </div>
-          <div className="mt-2 text-xs font-bold text-slate-700 dark:text-slate-300 bg-white/70 dark:bg-slate-800/70 px-2.5 py-0.5 rounded-full shadow-sm">
-            {evaluation.percentage}% Marks
-          </div>
-        </div>
+              {/* Examiner Override Form */}
+              {showOverridePanel && (
+                <Box sx={{ p: 2, borderRadius: 2, bgcolor: '#FFFBEB', border: '1px solid #FDE68A' }}>
+                  <form onSubmit={handleApplyOverride}>
+                    <Stack spacing={1.5}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography variant="caption" sx={{ fontWeight: 700, color: '#92400E' }}>
+                          Examiner Score Adjustment for Question #{activeQ.question_number}
+                        </Typography>
+                        <Button size="small" onClick={() => setShowOverridePanel(false)} sx={{ fontSize: '0.6875rem', color: '#92400E' }}>
+                          Cancel
+                        </Button>
+                      </Box>
 
-        {/* Criteria Breakdown (3 Columns) */}
-        <div className="sm:col-span-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3 border border-slate-200/80 dark:border-slate-800 flex flex-col justify-between">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                Correctness
-              </span>
-              <span className="text-xs font-mono font-bold text-indigo-600 dark:text-indigo-400">
-                {bd.factual_correctness ?? '–'} pts
-              </span>
-            </div>
-            <p className="text-[10px] text-slate-500 mt-1">
-              Factual, scientific, and mathematical accuracy
-            </p>
-            <div className="mt-3 w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
-              <div
-                className="bg-indigo-600 h-full rounded-full transition-all duration-500"
-                style={{ width: `${Math.min(100, ((bd.factual_correctness || 0) / (evaluation.max_score * 0.5 || 1)) * 100)}%` }}
-              ></div>
-            </div>
-          </div>
+                      <Grid container spacing={1.5}>
+                        <Grid size={{ xs: 12, sm: 4 }}>
+                          <TextField
+                            fullWidth
+                            size="small"
+                            type="number"
+                            label={`Adjusted Score (Max: ${activeQ.max_score})`}
+                            slotProps={{ htmlInput: { min: 0, max: activeQ.max_score, step: 0.5 } }}
+                            value={overrideScoreVal}
+                            onChange={(e) => setOverrideScoreVal(e.target.value)}
+                            required
+                            placeholder={activeQ.score.toString()}
+                            sx={{ bgcolor: '#FFFFFF' }}
+                          />
+                        </Grid>
+                        <Grid size={{ xs: 12, sm: 8 }}>
+                          <TextField
+                            fullWidth
+                            size="small"
+                            label="Examiner Remarks / Rationale"
+                            value={overrideNotesVal}
+                            onChange={(e) => setOverrideNotesVal(e.target.value)}
+                            placeholder="Reason for adjustment..."
+                            sx={{ bgcolor: '#FFFFFF' }}
+                          />
+                        </Grid>
+                      </Grid>
 
-          <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3 border border-slate-200/80 dark:border-slate-800 flex flex-col justify-between">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                Completeness
-              </span>
-              <span className="text-xs font-mono font-bold text-indigo-600 dark:text-indigo-400">
-                {bd.structural_completeness ?? '–'} pts
-              </span>
-            </div>
-            <p className="text-[10px] text-slate-500 mt-1">
-              Coverage of all required steps & diagrams
-            </p>
-            <div className="mt-3 w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
-              <div
-                className="bg-purple-600 h-full rounded-full transition-all duration-500"
-                style={{ width: `${Math.min(100, ((bd.structural_completeness || 0) / (evaluation.max_score * 0.3 || 1)) * 100)}%` }}
-              ></div>
-            </div>
-          </div>
+                      <Button
+                        type="submit"
+                        variant="contained"
+                        color="warning"
+                        size="small"
+                        disabled={isOverriding}
+                        sx={{ alignSelf: 'flex-start', fontWeight: 700 }}
+                      >
+                        {isOverriding ? 'Saving...' : 'Save Adjusted Marks'}
+                      </Button>
+                    </Stack>
+                  </form>
+                </Box>
+              )}
 
-          <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3 border border-slate-200/80 dark:border-slate-800 flex flex-col justify-between">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                Understanding
-              </span>
-              <span className="text-xs font-mono font-bold text-indigo-600 dark:text-indigo-400">
-                {bd.conceptual_understanding ?? '–'} pts
-              </span>
-            </div>
-            <p className="text-[10px] text-slate-500 mt-1">
-              Clarity of reasoning and terminology
-            </p>
-            <div className="mt-3 w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
-              <div
-                className="bg-emerald-600 h-full rounded-full transition-all duration-500"
-                style={{ width: `${Math.min(100, ((bd.conceptual_understanding || 0) / (evaluation.max_score * 0.2 || 1)) * 100)}%` }}
-              ></div>
-            </div>
-          </div>
-        </div>
-      </div>
+              {/* Criteria Progress Meters */}
+              <Grid container spacing={1.5}>
+                <Grid size={{ xs: 12, sm: 4 }}>
+                  <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.75 }}>
+                      <Typography variant="caption" sx={{ fontWeight: 700, color: '#334155' }}>Correctness</Typography>
+                      <Typography variant="caption" sx={{ fontWeight: 700, color: '#1E40AF', fontFamily: 'monospace' }}>
+                        {qbd.factual_correctness ?? '–'} pts
+                      </Typography>
+                    </Box>
+                    <LinearProgress
+                      variant="determinate"
+                      value={Math.min(100, ((qbd.factual_correctness || 0) / (activeQ.max_score * 0.5 || 1)) * 100)}
+                      sx={{ height: 6, borderRadius: 3, bgcolor: '#E2E8F0', '& .MuiLinearProgress-bar': { bgcolor: '#1E40AF' } }}
+                    />
+                  </Box>
+                </Grid>
 
-      {/* Overall Feedback */}
-      {evaluation.overall_feedback && (
-        <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800">
-          <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1">
-            Examiner Summary & Feedback
-          </span>
-          <p className="text-xs text-slate-800 dark:text-slate-200 leading-relaxed">
-            {evaluation.overall_feedback}
-          </p>
-        </div>
-      )}
+                <Grid size={{ xs: 12, sm: 4 }}>
+                  <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.75 }}>
+                      <Typography variant="caption" sx={{ fontWeight: 700, color: '#334155' }}>Completeness</Typography>
+                      <Typography variant="caption" sx={{ fontWeight: 700, color: '#6366F1', fontFamily: 'monospace' }}>
+                        {qbd.structural_completeness ?? '–'} pts
+                      </Typography>
+                    </Box>
+                    <LinearProgress
+                      variant="determinate"
+                      value={Math.min(100, ((qbd.structural_completeness || 0) / (activeQ.max_score * 0.3 || 1)) * 100)}
+                      sx={{ height: 6, borderRadius: 3, bgcolor: '#E2E8F0', '& .MuiLinearProgress-bar': { bgcolor: '#6366F1' } }}
+                    />
+                  </Box>
+                </Grid>
 
-      {/* Correct Points (Strengths) */}
-      {evaluation.correct_points && evaluation.correct_points.length > 0 && (
-        <div className="space-y-2">
-          <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-            <span className="text-emerald-500">✓</span> Demonstrated Strengths & Correct Steps
-          </h4>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {evaluation.correct_points.map((pt, i) => (
-              <div
-                key={i}
-                className="p-2.5 rounded-lg bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-900/40 text-xs text-emerald-950 dark:text-emerald-200 flex items-start gap-2"
-              >
-                <span className="text-emerald-500 shrink-0 mt-0.5">•</span>
-                <span>{pt}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+                <Grid size={{ xs: 12, sm: 4 }}>
+                  <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.75 }}>
+                      <Typography variant="caption" sx={{ fontWeight: 700, color: '#334155' }}>Understanding</Typography>
+                      <Typography variant="caption" sx={{ fontWeight: 700, color: '#059669', fontFamily: 'monospace' }}>
+                        {qbd.conceptual_understanding ?? '–'} pts
+                      </Typography>
+                    </Box>
+                    <LinearProgress
+                      variant="determinate"
+                      value={Math.min(100, ((qbd.conceptual_understanding || 0) / (activeQ.max_score * 0.2 || 1)) * 100)}
+                      sx={{ height: 6, borderRadius: 3, bgcolor: '#E2E8F0', '& .MuiLinearProgress-bar': { bgcolor: '#059669' } }}
+                    />
+                  </Box>
+                </Grid>
+              </Grid>
 
-      {/* Misconceptions & Conceptual Errors */}
-      {evaluation.misconceptions && evaluation.misconceptions.length > 0 && (
-        <div className="space-y-2.5">
-          <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-            <span className="text-rose-500">⚠️</span> Misconceptions & Student Conceptual Errors
-          </h4>
-          <div className="space-y-2">
-            {evaluation.misconceptions.map((item, i) => (
-              <div
-                key={i}
-                className="p-3 rounded-xl bg-rose-50/50 dark:bg-rose-950/20 border border-rose-200/60 dark:border-rose-900/40 text-xs space-y-1.5"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-rose-800 dark:text-rose-300">
-                    {item.concept || 'Conceptual Gap'}
-                  </span>
-                  {item.impact && (
-                    <span className="text-[10px] font-semibold text-rose-600 dark:text-rose-400 bg-rose-100 dark:bg-rose-900/40 px-2 py-0.5 rounded">
-                      {item.impact}
-                    </span>
+              {/* Student Answer Segment with Cleaned vs Raw OCR Toggle */}
+              <Box sx={{ p: 2, borderRadius: 2, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 1, mb: 1.5 }}>
+                  <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+                    <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>
+                      Student Answer (Q{activeQ.question_number})
+                    </Typography>
+                    {activeQ.sources_found_on_pages && activeQ.sources_found_on_pages.length > 0 && (
+                      <Chip
+                        size="small"
+                        icon={<PagesIcon sx={{ fontSize: 12 }} />}
+                        label={`Pages: ${activeQ.sources_found_on_pages.join(', ')}`}
+                        sx={{ height: 20, fontSize: '0.6875rem', bgcolor: '#EFF6FF', color: '#1E40AF', fontWeight: 700 }}
+                      />
+                    )}
+                    {activeQ.cleaning_notes && (
+                      <Chip
+                        size="small"
+                        icon={<SparklesIcon sx={{ fontSize: 12 }} />}
+                        label={activeQ.cleaning_notes}
+                        sx={{ height: 20, fontSize: '0.6875rem', bgcolor: '#F5F3FF', color: '#6D28D9', fontWeight: 600 }}
+                      />
+                    )}
+                  </Stack>
+
+                  {activeQ.raw_student_answer && activeQ.raw_student_answer !== (activeQ.cleaned_student_answer || activeQ.student_answer_text) && (
+                    <ToggleButtonGroup
+                      size="small"
+                      exclusive
+                      value={showRawAnswerMap[activeQ.question_number] ? 'raw' : 'cleaned'}
+                      onChange={(e, val) => {
+                        if (val) {
+                          setShowRawAnswerMap((prev) => ({ ...prev, [activeQ.question_number]: val === 'raw' }));
+                        }
+                      }}
+                      sx={{ height: 26 }}
+                    >
+                      <ToggleButton value="cleaned" sx={{ px: 1, fontSize: '0.6875rem', fontWeight: 700 }}>
+                        ✨ Cleaned & Collated
+                      </ToggleButton>
+                      <ToggleButton value="raw" sx={{ px: 1, fontSize: '0.6875rem', fontWeight: 700 }}>
+                        📝 Raw OCR Fragment
+                      </ToggleButton>
+                    </ToggleButtonGroup>
                   )}
-                </div>
-                {item.student_claim && (
-                  <p className="text-[11px] text-slate-600 dark:text-slate-400">
-                    <strong className="text-rose-700 dark:text-rose-400">Student Claim:</strong> "{item.student_claim}"
-                  </p>
+                </Box>
+
+                <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: '#FFFFFF', border: '1px solid #E2E8F0' }}>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      fontFamily: '"JetBrains Mono", monospace',
+                      fontSize: '0.8125rem',
+                      whiteSpace: 'pre-wrap',
+                      lineHeight: 1.6,
+                      color: '#0F172A',
+                    }}
+                  >
+                    {showRawAnswerMap[activeQ.question_number]
+                      ? (activeQ.raw_student_answer || activeQ.student_answer_text || 'No raw fragment recorded')
+                      : (activeQ.cleaned_student_answer || activeQ.student_answer_text || '[Not attempted by student in submitted sheet]')}
+                  </Typography>
+                </Box>
+              </Box>
+
+              {/* Strengths & Correct Points */}
+              {activeQ.correct_points && activeQ.correct_points.length > 0 && (
+                <Box>
+                  <Typography variant="caption" sx={{ fontWeight: 800, color: '#065F46', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
+                    <CheckIcon sx={{ fontSize: 16, color: '#059669' }} /> Correct Steps Demonstrated
+                  </Typography>
+                  <Grid container spacing={1}>
+                    {activeQ.correct_points.map((pt, i) => (
+                      <Grid size={{ xs: 12, sm: 6 }} key={i}>
+                        <Box sx={{ p: 1.25, borderRadius: 1.5, bgcolor: '#ECFDF5', border: '1px solid #A7F3D0', display: 'flex', gap: 1 }}>
+                          <CheckIcon sx={{ fontSize: 14, color: '#059669', mt: 0.25, flexShrink: 0 }} />
+                          <Typography variant="caption" sx={{ color: '#064E3B', fontWeight: 600 }}>
+                            {pt}
+                          </Typography>
+                        </Box>
+                      </Grid>
+                    ))}
+                  </Grid>
+                </Box>
+              )}
+
+              {/* Misconceptions & Conceptual Errors */}
+              {activeQ.misconceptions && activeQ.misconceptions.length > 0 && (
+                <Box>
+                  <Typography variant="caption" sx={{ fontWeight: 800, color: '#991B1B', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
+                    <ErrorIcon sx={{ fontSize: 16, color: '#DC2626' }} /> Conceptual Errors & Misconceptions
+                  </Typography>
+                  <Stack spacing={1}>
+                    {activeQ.misconceptions.map((item, i) => (
+                      <Box key={i} sx={{ p: 1.5, borderRadius: 2, bgcolor: '#FEF2F2', border: '1px solid #FECACA' }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                          <Typography variant="caption" sx={{ fontWeight: 800, color: '#991B1B' }}>
+                            {item.concept || 'Conceptual Flaw'}
+                          </Typography>
+                          {item.impact && (
+                            <Chip size="small" label={item.impact} sx={{ height: 18, fontSize: '0.625rem', bgcolor: '#FEE2E2', color: '#991B1B', fontWeight: 700 }} />
+                          )}
+                        </Box>
+                        {item.student_claim && (
+                          <Typography variant="caption" sx={{ color: '#7F1D1D', display: 'block', mb: 0.5 }}>
+                            <strong>Student Claim:</strong> "{item.student_claim}"
+                          </Typography>
+                        )}
+                        {item.correction && (
+                          <Box sx={{ p: 1, borderRadius: 1, bgcolor: '#FFFFFF', border: '1px solid #FCA5A5' }}>
+                            <Typography variant="caption" sx={{ color: '#065F46', fontWeight: 600 }}>
+                              <strong>Curriculum Correction:</strong> {item.correction}
+                            </Typography>
+                          </Box>
+                        )}
+                      </Box>
+                    ))}
+                  </Stack>
+                </Box>
+              )}
+
+              {/* Missing Concepts */}
+              {activeQ.missing_concepts && activeQ.missing_concepts.length > 0 && (
+                <Box>
+                  <Typography variant="caption" sx={{ fontWeight: 800, color: '#92400E', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.75 }}>
+                    <WarningIcon sx={{ fontSize: 16, color: '#D97706' }} /> Missing Concepts / Unaddressed Criteria
+                  </Typography>
+                  <Stack direction="row" spacing={0.75} sx={{ flexWrap: 'wrap' }}>
+                    {activeQ.missing_concepts.map((mc, i) => (
+                      <Chip
+                        key={i}
+                        size="small"
+                        label={`• ${mc}`}
+                        sx={{ bgcolor: '#FEF3C7', color: '#92400E', border: '1px solid #FDE68A', fontWeight: 600, fontSize: '0.6875rem' }}
+                      />
+                    ))}
+                  </Stack>
+                </Box>
+              )}
+
+              {/* Targeted Textbook Revision */}
+              {activeQ.improvement_guidance && activeQ.improvement_guidance.length > 0 && (
+                <Box>
+                  <Typography variant="caption" sx={{ fontWeight: 800, color: '#1E40AF', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
+                    <BookIcon sx={{ fontSize: 16, color: '#1E40AF' }} /> Targeted Textbook Revision
+                  </Typography>
+                  <Stack spacing={1}>
+                    {activeQ.improvement_guidance.map((g, i) => (
+                      <Box key={i} sx={{ p: 1.25, borderRadius: 1.5, bgcolor: '#EFF6FF', border: '1px solid #BFDBFE' }}>
+                        <Typography variant="caption" sx={{ fontWeight: 800, color: '#1E3A8A', display: 'block' }}>
+                          {g.resource || 'NCERT Textbook Reference'}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: '#1E40AF', display: 'block' }}>
+                          {g.suggestion}
+                        </Typography>
+                        {g.practice && (
+                          <Typography variant="caption" sx={{ color: '#4338CA', fontFamily: 'monospace', fontWeight: 600, mt: 0.25, display: 'block' }}>
+                            🎯 Practice: {g.practice}
+                          </Typography>
+                        )}
+                      </Box>
+                    ))}
+                  </Stack>
+                </Box>
+              )}
+            </Stack>
+          </Paper>
+
+          {/* ─────────────────────────────────────────────────────────
+           * D. RAG PIPELINE & CURRICULUM GROUNDING INSPECTOR
+           * ───────────────────────────────────────────────────────── */}
+          <Accordion
+            expanded={showFullRagTrace}
+            onChange={() => setShowFullRagTrace(!showFullRagTrace)}
+            elevation={0}
+            sx={{
+              border: '1px solid #C7D2FE',
+              borderRadius: '12px !important',
+              bgcolor: '#F5F7FF',
+              '&::before': { display: 'none' },
+            }}
+          >
+            <AccordionSummary expandIcon={<ExpandMoreIcon sx={{ color: '#4338CA' }} />}>
+              <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+                <Box sx={{ width: 28, height: 28, borderRadius: 1.5, bgcolor: '#E0E7FF', color: '#4338CA', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <BrainIcon sx={{ fontSize: 18 }} />
+                </Box>
+                <Box>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#312E81', textTransform: 'uppercase', fontSize: '0.75rem' }}>
+                    Qdrant RAG Grounding & Telemetry Inspector
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: '#6366F1' }}>
+                    Targeted vector search results for Question #{activeQ.question_number}
+                  </Typography>
+                </Box>
+              </Stack>
+            </AccordionSummary>
+
+            <AccordionDetails sx={{ pt: 0, px: 2.5, pb: 2.5 }}>
+              <Stack spacing={2}>
+                <Divider sx={{ borderColor: '#E0E7FF' }} />
+
+                {/* Metrics Grid */}
+                <Grid container spacing={1.5}>
+                  <Grid size={{ xs: 6, sm: 3 }}>
+                    <Box sx={{ p: 1.25, borderRadius: 1.5, bgcolor: '#FFFFFF', border: '1px solid #E2E8F0' }}>
+                      <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 700, display: 'block' }}>Vector DB</Typography>
+                      <Typography variant="caption" sx={{ fontWeight: 800, color: '#0F172A', fontFamily: 'monospace' }}>
+                        Qdrant ({activeRagTrace?.qdrant_collection || 'k12_textbooks'})
+                      </Typography>
+                    </Box>
+                  </Grid>
+
+                  <Grid size={{ xs: 6, sm: 3 }}>
+                    <Box sx={{ p: 1.25, borderRadius: 1.5, bgcolor: '#FFFFFF', border: '1px solid #E2E8F0' }}>
+                      <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 700, display: 'block' }}>Embeddings</Typography>
+                      <Typography variant="caption" sx={{ fontWeight: 800, color: '#0F172A', fontFamily: 'monospace' }}>
+                        MiniLM-L6-v2 (384d)
+                      </Typography>
+                    </Box>
+                  </Grid>
+
+                  <Grid size={{ xs: 6, sm: 3 }}>
+                    <Box sx={{ p: 1.25, borderRadius: 1.5, bgcolor: '#FFFFFF', border: '1px solid #E2E8F0' }}>
+                      <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 700, display: 'block' }}>Retrieved Chunks</Typography>
+                      <Typography variant="caption" sx={{ fontWeight: 800, color: '#0F172A', fontFamily: 'monospace' }}>
+                        {activeRagTrace?.chunks?.length || 0} Grounded
+                      </Typography>
+                    </Box>
+                  </Grid>
+
+                  <Grid size={{ xs: 6, sm: 3 }}>
+                    <Box sx={{ p: 1.25, borderRadius: 1.5, bgcolor: '#FFFFFF', border: '1px solid #E2E8F0' }}>
+                      <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 700, display: 'block' }}>Status</Typography>
+                      <Typography variant="caption" sx={{ fontWeight: 800, color: '#059669', fontFamily: 'monospace' }}>
+                        {activeRagTrace?.retrieval_status || 'ACTIVE'}
+                      </Typography>
+                    </Box>
+                  </Grid>
+                </Grid>
+
+                {/* Metadata Filter Display */}
+                {activeRagTrace?.filter_subject && (
+                  <Box sx={{ p: 1.25, borderRadius: 1.5, bgcolor: '#EEF2FF', border: '1px solid #C7D2FE', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1 }}>
+                    <Typography variant="caption" sx={{ fontWeight: 800, color: '#312E81' }}>
+                      🎯 Qdrant Metadata Filter Applied:
+                    </Typography>
+                    <Chip size="small" label={`subject: ${activeRagTrace.filter_subject}`} sx={{ bgcolor: '#FFFFFF', color: '#1E40AF', fontWeight: 700, fontSize: '0.6875rem' }} />
+                    {activeRagTrace.filter_academic_level && (
+                      <Chip size="small" label={`class_level: ${activeRagTrace.filter_academic_level}`} sx={{ bgcolor: '#FFFFFF', color: '#1E40AF', fontWeight: 700, fontSize: '0.6875rem' }} />
+                    )}
+                    <Typography variant="caption" sx={{ color: '#6366F1' }}>
+                      (Strict curriculum isolation active)
+                    </Typography>
+                  </Box>
                 )}
-                {item.correction && (
-                  <p className="text-[11px] text-slate-700 dark:text-slate-300 bg-white/80 dark:bg-slate-900/80 p-2 rounded-lg border border-rose-100 dark:border-rose-900/40">
-                    <strong className="text-emerald-700 dark:text-emerald-400">Correction:</strong> {item.correction}
-                  </p>
+
+                {/* Formulated Query */}
+                {activeRagTrace?.query && (
+                  <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: '#FFFFFF', border: '1px solid #E2E8F0' }}>
+                    <Typography variant="caption" sx={{ fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', display: 'block', mb: 0.25 }}>
+                      Search Query Dispatched to Qdrant:
+                    </Typography>
+                    <Typography variant="caption" sx={{ fontFamily: 'monospace', color: '#0F172A', display: 'block' }} noWrap>
+                      "{activeRagTrace.query}"
+                    </Typography>
+                    {activeRagTrace.keywords && activeRagTrace.keywords.length > 0 && (
+                      <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap', mt: 1 }}>
+                        <Typography variant="caption" sx={{ color: '#94A3B8', fontSize: '0.625rem' }}>Keywords:</Typography>
+                        {activeRagTrace.keywords.map((kw, i) => (
+                          <Chip key={i} size="small" label={kw} sx={{ height: 18, fontSize: '0.625rem', bgcolor: '#F1F5F9', color: '#475569' }} />
+                        ))}
+                      </Stack>
+                    )}
+                  </Box>
                 )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
-      {/* Missing Concepts */}
-      {evaluation.missing_concepts && evaluation.missing_concepts.length > 0 && (
-        <div className="space-y-2">
-          <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-            <span className="text-amber-500">⚡</span> Missing Concepts & Required Elements
-          </h4>
-          <div className="flex flex-wrap gap-1.5">
-            {evaluation.missing_concepts.map((concept, i) => (
-              <span
-                key={i}
-                className="px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 text-amber-800 dark:text-amber-300 text-[11px] font-medium"
-              >
-                - {concept}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Remedial Textbook Guidance */}
-      {evaluation.improvement_guidance && evaluation.improvement_guidance.length > 0 && (
-        <div className="space-y-2">
-          <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-            <span className="text-indigo-500">📚</span> Targeted Textbook Chapters & Practice
-          </h4>
-          <div className="space-y-2">
-            {evaluation.improvement_guidance.map((guide, i) => (
-              <div
-                key={i}
-                className="p-3 rounded-xl bg-indigo-50/40 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/40 text-xs space-y-1"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-indigo-900 dark:text-indigo-300">
-                    {guide.resource || 'Curriculum Reference'}
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-700 dark:text-slate-300">
-                  {guide.suggestion}
-                </p>
-                {guide.practice && (
-                  <p className="text-[10px] text-indigo-700 dark:text-indigo-400 font-mono">
-                    🎯 Practice: {guide.practice}
-                  </p>
+                {/* Retrieved Textbook Chunks */}
+                {activeRagTrace?.chunks && activeRagTrace.chunks.length > 0 ? (
+                  <Stack spacing={1.5}>
+                    <Typography variant="caption" sx={{ fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>
+                      Authoritative Textbook Chunks Grounded:
+                    </Typography>
+                    {activeRagTrace.chunks.map((chunk, i) => (
+                      <Box key={i} sx={{ p: 1.5, borderRadius: 2, bgcolor: '#FFFFFF', border: '1px solid #E2E8F0' }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.75 }}>
+                          <Typography variant="caption" sx={{ fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <BookIcon sx={{ fontSize: 14, color: '#1E40AF' }} /> {chunk.chapter}
+                          </Typography>
+                          <Chip
+                            size="small"
+                            label={`${chunk.match_percentage}% Cosine Match`}
+                            color="success"
+                            sx={{ height: 20, fontSize: '0.6875rem', fontWeight: 800 }}
+                          />
+                        </Box>
+                        <Typography variant="body2" sx={{ fontSize: '0.75rem', color: '#334155', fontStyle: 'italic', bgcolor: '#F8FAFC', p: 1.25, borderRadius: 1, border: '1px solid #F1F5F9', mb: 0.5 }}>
+                          "{chunk.text}"
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: '#94A3B8', fontSize: '0.625rem', display: 'block' }}>
+                          Source: {chunk.source}
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Stack>
+                ) : (
+                  <Typography variant="caption" sx={{ color: '#94A3B8', fontStyle: 'italic' }}>
+                    Standard rubric & heuristic evaluation applied for this question.
+                  </Typography>
                 )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Extracted OCR Transcription (Collapsible) */}
-      <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
-        <button
-          type="button"
-          onClick={() => setShowExtractedText(!showExtractedText)}
-          className="w-full flex items-center justify-between text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white py-1"
-        >
-          <span className="flex items-center gap-2">
-            🔍 Extracted OCR Text & Diagrams {evaluation.diagram_detected && '(Diagram Detected)'}
-          </span>
-          <span>{showExtractedText ? '▲ Collapse' : '▼ Expand'}</span>
-        </button>
-
-        {showExtractedText && (
-          <div className="mt-3 p-3.5 rounded-xl bg-slate-900 text-slate-100 font-mono text-[11px] leading-relaxed overflow-x-auto max-h-60 border border-slate-800">
-            <pre className="whitespace-pre-wrap font-mono">
-              {evaluation.extracted_text || 'No text extracted.'}
-            </pre>
-            {evaluation.diagram_metadata?.shapes_detected && (
-              <div className="mt-3 pt-2 border-t border-slate-800 text-[10px] text-slate-400">
-                Detected geometric shapes: {evaluation.diagram_metadata.shapes_detected.length} items
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
+              </Stack>
+            </AccordionDetails>
+          </Accordion>
+        </Stack>
+      </CardContent>
+    </Card>
   );
 };
 

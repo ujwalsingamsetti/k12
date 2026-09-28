@@ -1,4 +1,4 @@
-import logging
+from loguru import logger
 from PIL import Image
 import os
 import cv2
@@ -10,16 +10,16 @@ from app.core.config import settings
 from app.services.diagram_service import DiagramService
 from app.services.question_region_detector import QuestionRegionDetector
 
-logger = logging.getLogger(__name__)
 
 class OCRService:
-    """OCR service using Google Cloud Vision API for maximum accuracy"""
+    """OCR service using Google Cloud Vision API with Gemini Vision fallback circuit breaker."""
     
     def __init__(self):
         self.vision_client = None
         self.spell = SpellChecker()
         self.diagram_service = None
         self.region_detector = QuestionRegionDetector()
+        self._gcv_disabled: bool = os.environ.get("USE_GEMINI_OCR_PRIMARY", "true").lower() in ("true", "1", "yes")
         
         # Add domain-specific vocabulary (Science/Math terms)
         science_math_terms = [
@@ -77,7 +77,7 @@ class OCRService:
         return await asyncio.to_thread(self.extract_text_from_image, image_path)
 
     def extract_text_from_image(self, image_path: str) -> tuple:
-        """Extract text and diagrams using Google Cloud Vision API with early quality-gating and in-memory processing
+        """Extract text and diagrams using Google Cloud Vision API with early quality-gating and in-memory processing.
         
         Returns:
             tuple: (extracted_text, diagram_metadata)
@@ -89,49 +89,63 @@ class OCRService:
             
             logger.info(f"Extracting text from: {image_path}")
             
-            # Approach 1: Original image
-            text1, conf1 = self._extract_with_confidence(image_path)
-            
-            # Quality Gate / Early Exit: If the original image achieves high confidence and substantive text,
-            # return immediately! Avoids 2 redundant Vision API calls (saves ~66% latency and API cost).
-            if conf1 >= 0.85 and len(text1.strip()) >= 30:
-                logger.info(f"OCR high-confidence early exit: original image passed (conf={conf1:.2f}, len={len(text1)})")
-                best_text, best_conf, method = text1, conf1, 'original'
-            else:
-                results = []
-                if text1:
-                    results.append((text1, conf1, 'original'))
-                
-                # Approach 2: In-memory preprocessed image (denoised + sharpened + binarised)
-                prep_bytes = self._preprocess_in_memory(image_path)
-                if prep_bytes:
-                    text2, conf2 = self._extract_bytes_with_confidence(prep_bytes)
-                    if text2:
-                        results.append((text2, conf2, 'preprocessed'))
-                
-                # Approach 3: In-memory deskewed image (fixes rotated/tilted sheets)
-                deskew_bytes = self._deskew_in_memory(image_path)
-                if deskew_bytes:
-                    text3, conf3 = self._extract_bytes_with_confidence(deskew_bytes)
-                    if text3:
-                        results.append((text3, conf3, 'deskewed'))
-                
-                if not results:
-                    logger.warning("Google Cloud Vision produced no results or encountered an API error. Invoking high-accuracy Gemini Vision OCR fallback...")
-                    gemini_text = self._extract_with_gemini_vision(image_path)
-                    if gemini_text:
-                        results.append((gemini_text, 0.95, 'gemini_vision_fallback'))
-                
-                if not results:
+            # Circuit breaker: if Google Cloud Vision was disabled or failed previously, directly use Gemini Vision OCR
+            if getattr(self, "_gcv_disabled", False):
+                logger.info("GCV circuit breaker active — directly invoking high-accuracy Gemini Vision OCR")
+                gemini_text = self._extract_with_gemini_vision(image_path)
+                if not gemini_text:
                     raise ValueError(
                         "No text could be extracted from the image. "
                         "Please ensure the image is clear and contains readable text."
                     )
+                best_text, best_conf, method = gemini_text, 0.95, 'gemini_vision'
+            else:
+                # Approach 1: Original image
+                text1, conf1 = self._extract_with_confidence(image_path)
                 
-                best_conf = max(r[1] for r in results)
-                candidates = [r for r in results if r[1] >= best_conf - 0.05]
-                best_text, best_conf, method = max(candidates, key=lambda x: len(x[0]))
-                logger.info(f"Best OCR method selected: {method} (conf={best_conf:.2f}, len={len(best_text)})")
+                # Quality Gate / Early Exit: If the original image achieves high confidence and substantive text,
+                # return immediately! Avoids 2 redundant Vision API calls (saves ~66% latency and API cost).
+                if conf1 >= 0.85 and len(text1.strip()) >= 30:
+                    logger.info(f"OCR high-confidence early exit: original image passed (conf={conf1:.2f}, len={len(text1)})")
+                    best_text, best_conf, method = text1, conf1, 'original'
+                else:
+                    results = []
+                    if text1:
+                        results.append((text1, conf1, 'original'))
+                    
+                    if not getattr(self, "_gcv_disabled", False):
+                        # Approach 2: In-memory preprocessed image (denoised + sharpened + binarised)
+                        prep_bytes = self._preprocess_in_memory(image_path)
+                        if prep_bytes:
+                            text2, conf2 = self._extract_bytes_with_confidence(prep_bytes)
+                            if text2:
+                                results.append((text2, conf2, 'preprocessed'))
+                    
+                    if not getattr(self, "_gcv_disabled", False):
+                        # Approach 3: In-memory deskewed image (fixes rotated/tilted sheets)
+                        deskew_bytes = self._deskew_in_memory(image_path)
+                        if deskew_bytes:
+                            text3, conf3 = self._extract_bytes_with_confidence(deskew_bytes)
+                            if text3:
+                                results.append((text3, conf3, 'deskewed'))
+                    
+                    if not results:
+                        logger.warning("Google Cloud Vision produced no results or encountered an API error. Invoking high-accuracy Gemini Vision OCR fallback...")
+                        self._gcv_disabled = True
+                        gemini_text = self._extract_with_gemini_vision(image_path)
+                        if gemini_text:
+                            results.append((gemini_text, 0.95, 'gemini_vision_fallback'))
+                    
+                    if not results:
+                        raise ValueError(
+                            "No text could be extracted from the image. "
+                            "Please ensure the image is clear and contains readable text."
+                        )
+                    
+                    best_conf = max(r[1] for r in results)
+                    candidates = [r for r in results if r[1] >= best_conf - 0.05]
+                    best_text, best_conf, method = max(candidates, key=lambda x: len(x[0]))
+                    logger.info(f"Best OCR method selected: {method} (conf={best_conf:.2f}, len={len(best_text)})")
                 
             # Post-process text with spelling and formula protection
             processed_text = str(self._post_process_text(best_text, image_path))
@@ -143,11 +157,14 @@ class OCRService:
             
             # Extract diagrams with question mapping
             diagram_metadata = {}
-            if self.diagram_service:
-                diagram_metadata = self.diagram_service.extract_diagrams(
-                    image_path, 
-                    question_regions=question_regions
-                )
+            if self.diagram_service and not getattr(self, "_gcv_disabled", False):
+                try:
+                    diagram_metadata = self.diagram_service.extract_diagrams(
+                        image_path, 
+                        question_regions=question_regions
+                    )
+                except Exception as diag_err:
+                    logger.warning(f"Diagram extraction skipped/failed: {diag_err}")
             
             if diagram_metadata.get("has_diagrams"):
                 shapes = diagram_metadata.get('shapes_detected', [])
@@ -352,7 +369,9 @@ class OCRService:
             return None
 
     def _extract_bytes_with_confidence(self, content: bytes) -> tuple:
-        """Extract text with confidence score from Google Vision using in-memory byte buffer"""
+        """Extract text with confidence score from Google Vision using in-memory byte buffer."""
+        if getattr(self, "_gcv_disabled", False):
+            return "", 0.0
         try:
             from google.cloud import vision
             image = vision.Image(content=content)
@@ -363,6 +382,10 @@ class OCRService:
             )
             
             if response.error.message:
+                err_msg = response.error.message.lower()
+                if "billing" in err_msg or "billing_disabled" in err_msg or "permission" in err_msg:
+                    logger.warning(f"Google Cloud Vision error: {response.error.message}. Switching to Gemini Vision circuit breaker.")
+                    self._gcv_disabled = True
                 return "", 0.0
             
             if response.full_text_annotation:
@@ -381,11 +404,17 @@ class OCRService:
             
             return "", 0.0
         except Exception as e:
+            err_msg = str(e).lower()
+            if "billing" in err_msg or "billing_disabled" in err_msg or "permission" in err_msg:
+                logger.warning(f"Google Cloud Vision exception: {e}. Switching to Gemini Vision circuit breaker.")
+                self._gcv_disabled = True
             logger.warning(f"Byte extraction failed: {e}")
             return "", 0.0
 
     def _extract_with_confidence(self, image_path: str) -> tuple:
-        """Extract text with confidence score from Google Vision for a file path"""
+        """Extract text with confidence score from Google Vision for a file path."""
+        if getattr(self, "_gcv_disabled", False):
+            return "", 0.0
         try:
             with open(image_path, 'rb') as image_file:
                 content = image_file.read()
@@ -395,7 +424,7 @@ class OCRService:
             return "", 0.0
 
     def _extract_with_gemini_vision(self, image_path: str) -> str:
-        """High-accuracy fallback OCR using Gemini multimodal vision (handles handwriting, math, and diagrams)"""
+        """High-accuracy fallback OCR using Gemini multimodal vision (handles handwriting, math, and diagrams)."""
         try:
             from dotenv import load_dotenv
             load_dotenv()
@@ -406,7 +435,7 @@ class OCRService:
 
             from google import genai
             from PIL import Image
-            api_key = os.environ.get("GEMINI_API_KEY") or getattr(settings, "GEMINI_API_KEY", None)
+            api_key = os.environ.get("GEMINI_API_KEY")
             if not api_key:
                 logger.warning("GEMINI_API_KEY not found for fallback OCR")
                 return ""
@@ -418,13 +447,24 @@ class OCRService:
                 "Transcribe all handwritten student text, questions, answers, and mathematical formulas from this exam script image verbatim. "
                 "Preserve question numbers (e.g. Q1, Ans 2), section headers, and formulas accurately without summarizing or altering words."
             )
-            response = client.models.generate_content(
-                model=os.environ.get("GEMINI_MODEL", "gemini-2.5-flash"),
-                contents=[prompt, img]
-            )
-            if response and response.text:
-                logger.info(f"Gemini Vision OCR successfully transcribed {len(response.text)} characters")
-                return response.text.strip()
+            candidate_models = [
+                "gemini-3.5-flash-lite",
+                "gemini-3.6-flash",
+                os.environ.get("GEMINI_MODEL", "gemini-2.5-flash"),
+                "gemini-3.5-flash",
+            ]
+            for model_name in candidate_models:
+                try:
+                    response = client.models.generate_content(
+                        model=model_name,
+                        contents=[prompt, img]
+                    )
+                    if response and response.text:
+                        logger.info(f"Gemini Vision OCR ({model_name}) successfully transcribed {len(response.text)} characters")
+                        return response.text.strip()
+                except Exception as m_err:
+                    logger.warning(f"Gemini Vision model {model_name} attempt failed: {m_err}")
+                    continue
             return ""
         except Exception as e:
             logger.error(f"Gemini Vision OCR fallback failed: {e}")
@@ -448,8 +488,13 @@ class OCRService:
         return text
     
     def _enhance_text_with_llm(self, text: str, image_path: Optional[str] = None) -> str:
-        """Bypass Gemini Vision and perfectly fix OCR spelling mistakes locally."""
-        return self._fix_spelling_with_math_protection(text)
+        """Preserve exact OCR transcription without destructive dictionary replacements.
+        
+        Note: Full semantic OCR normalization, typo correction, and multi-page collation
+        are handled with complete subject and curriculum awareness in the downstream
+        AnswerNormalizer LLM pipeline.
+        """
+        return text
 
     
     def _fix_common_ocr_errors(self, text: str) -> str:

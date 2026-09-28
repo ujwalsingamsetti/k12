@@ -5,8 +5,8 @@
 // VITE_API_BASE_URL fallback to '/api'
 export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '');
 
-// Request Timeout (30 seconds)
-export const API_TIMEOUT_MS = 30000;
+// Request Timeout (300 seconds / 5 minutes for comprehensive multi-question evaluations)
+export const API_TIMEOUT_MS = 300000;
 
 // Polling intervals
 export const NOTIFICATION_POLL_INTERVAL_MS = 15000;

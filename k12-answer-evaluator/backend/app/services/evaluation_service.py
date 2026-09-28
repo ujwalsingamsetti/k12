@@ -102,6 +102,19 @@ class EvaluationService:
         )
         return response.text
     
+    # Question types that must be scored binary (full marks or zero, no partial credit)
+    BINARY_QUESTION_TYPES = frozenset({
+        "mcq", "multiple choice", "multiple choice question",
+        "assertion-reasoning", "assertion reasoning", "assertion & reasoning",
+        "true/false", "true or false", "true false",
+        "fill in the blank", "fill in the blanks", "fill in blank",
+        "match the following", "match the columns",
+    })
+
+    def _is_binary_question_type(self, question_type: str) -> bool:
+        """Check whether a question type requires strict binary scoring (full marks or zero)."""
+        return question_type.strip().lower() in self.BINARY_QUESTION_TYPES
+
     async def evaluate_answer_async(
         self,
         question: str,
@@ -114,11 +127,16 @@ class EvaluationService:
         marking_scheme: dict = None,
         rag_scores: List[float] = None,
         system_type: str = "general",
-        academic_level: str = None
+        academic_level: str = None,
+        question_type: str = ""
     ) -> Dict:
-        """Asynchronously evaluate student answer with primary provider and fallback"""
+        """Asynchronously evaluate student answer with primary provider and fallback."""
         effective_level = academic_level or class_level
-        logger.info(f"[Async] Evaluating {subject} Q (max: {max_score} marks, provider: {self.provider}, level: {effective_level})")
+        is_binary = self._is_binary_question_type(question_type)
+        logger.info(
+            f"[Async] Evaluating {subject} Q (max: {max_score} marks, provider: {self.provider}, "
+            f"level: {effective_level}, type: {question_type or 'unspecified'}, binary: {is_binary})"
+        )
         
         try:
             sys_instruction = self._create_system_instruction(
@@ -126,7 +144,8 @@ class EvaluationService:
                 max_score=max_score,
                 system_type=system_type,
                 academic_level=effective_level,
-                class_level=class_level
+                class_level=class_level,
+                question_type=question_type
             )
             user_prompt = self._create_user_prompt(
                 question=question,
@@ -164,13 +183,25 @@ class EvaluationService:
                         raise ge
 
             evaluation = self._parse_response(raw_response, max_score)
+
+            # For binary question types, enforce strict 0 or max_score BEFORE finalization
+            if is_binary:
+                raw_score = float(evaluation.get("score", 0))
+                evaluation["score"] = max_score if raw_score >= (max_score * 0.8) else 0
+                logger.info(
+                    f"🔒 Binary enforcement ({question_type}): LLM raw={raw_score}, "
+                    f"final={evaluation['score']}/{max_score}"
+                )
+
             return self._finalize_evaluation(
                 evaluation, student_answer, rag_scores, marking_scheme,
-                max_score, system_type, effective_level, provider=provider_used, model=model_used
+                max_score, system_type, effective_level,
+                provider=provider_used, model=model_used,
+                question_type=question_type
             )
         except Exception as e:
             logger.error(f"❌ Async evaluation failed: {e}")
-            return self._create_fallback_evaluation(max_score, str(e))
+            return self._create_fallback_evaluation(max_score, str(e), question_type=question_type)
 
     def evaluate_answer(
         self,
@@ -184,11 +215,16 @@ class EvaluationService:
         marking_scheme: dict = None,
         rag_scores: List[float] = None,
         system_type: str = "general",
-        academic_level: str = None
+        academic_level: str = None,
+        question_type: str = ""
     ) -> Dict:
-        """Evaluate student answer synchronously with primary provider and fallback"""
+        """Evaluate student answer synchronously with primary provider and fallback."""
         effective_level = academic_level or class_level
-        logger.info(f"Evaluating {subject} Q (max: {max_score} marks, provider: {self.provider}, level: {effective_level})")
+        is_binary = self._is_binary_question_type(question_type)
+        logger.info(
+            f"Evaluating {subject} Q (max: {max_score} marks, provider: {self.provider}, "
+            f"level: {effective_level}, type: {question_type or 'unspecified'}, binary: {is_binary})"
+        )
         
         try:
             sys_instruction = self._create_system_instruction(
@@ -196,7 +232,8 @@ class EvaluationService:
                 max_score=max_score,
                 system_type=system_type,
                 academic_level=effective_level,
-                class_level=class_level
+                class_level=class_level,
+                question_type=question_type
             )
             user_prompt = self._create_user_prompt(
                 question=question,
@@ -233,13 +270,25 @@ class EvaluationService:
                         raise ge
 
             evaluation = self._parse_response(raw_response, max_score)
+
+            # For binary question types, enforce strict 0 or max_score BEFORE finalization
+            if is_binary:
+                raw_score = float(evaluation.get("score", 0))
+                evaluation["score"] = max_score if raw_score >= (max_score * 0.8) else 0
+                logger.info(
+                    f"🔒 Binary enforcement ({question_type}): LLM raw={raw_score}, "
+                    f"final={evaluation['score']}/{max_score}"
+                )
+
             return self._finalize_evaluation(
                 evaluation, student_answer, rag_scores, marking_scheme,
-                max_score, system_type, effective_level, provider=provider_used, model=model_used
+                max_score, system_type, effective_level,
+                provider=provider_used, model=model_used,
+                question_type=question_type
             )
         except Exception as e:
             logger.error(f"❌ Evaluation failed: {e}")
-            return self._create_fallback_evaluation(max_score, str(e))
+            return self._create_fallback_evaluation(max_score, str(e), question_type=question_type)
 
     def _finalize_evaluation(
         self,
@@ -251,30 +300,47 @@ class EvaluationService:
         system_type: str,
         effective_level: str,
         provider: str = "deepseek",
-        model: str = "deepseek-chat"
+        model: str = "deepseek-chat",
+        question_type: str = ""
     ) -> Dict:
-        """Apply confidence calculation, leniency boost, and metadata packaging"""
+        """Apply confidence calculation, leniency boost, and metadata packaging.
+
+        For binary question types (MCQ, True/False, Fill in the Blank, etc.)
+        the confidence-based leniency boost is completely skipped — the LLM
+        score (already clamped to 0 or max_score) is used directly.
+        """
         confidence = self._calculate_confidence(
             evaluation, student_answer, rag_scores or [], marking_scheme
         )
         
-        # Apply confidence-based leniency overrides
-        original_score = float(evaluation.get("score", 0))
-        if confidence > 0.65:
-            evaluation["score"] = max_score
-            logger.info(f"Confidence {confidence:.2f} > 0.65: Boosted score from {original_score} to {max_score}")
-        elif confidence > 0.50:
-            boosted_score = max(0, max_score - 1)
-            evaluation["score"] = max(original_score, boosted_score)
-            logger.info(f"Confidence {confidence:.2f} > 0.50: Boosted score from {original_score} to {evaluation['score']}")
-        elif confidence > 0.30:
-            boosted_score = max_score / 2.0
-            evaluation["score"] = max(original_score, boosted_score)
-            logger.info(f"Confidence {confidence:.2f} > 0.30: Boosted score from {original_score} to {evaluation['score']}")
-        elif confidence > 0.20:
-            boosted_score = max(0, (max_score / 2.0) - 1.0)
-            evaluation["score"] = max(original_score, boosted_score)
-            logger.info(f"Confidence {confidence:.2f} > 0.20: Boosted score from {original_score} to {evaluation['score']}")
+        is_binary = self._is_binary_question_type(question_type)
+
+        if is_binary:
+            # ── STRICT BINARY PATH ──
+            # No leniency boost whatsoever — the score was already enforced
+            # to 0 or max_score before entering this method.
+            logger.info(
+                f"🔒 Binary question ({question_type}): skipping confidence leniency. "
+                f"Score stays {evaluation.get('score', 0)}/{max_score}, confidence={confidence:.2f}"
+            )
+        else:
+            # ── STANDARD PATH — confidence-based leniency overrides ──
+            original_score = float(evaluation.get("score", 0))
+            if confidence > 0.65:
+                evaluation["score"] = max_score
+                logger.info(f"Confidence {confidence:.2f} > 0.65: Boosted score from {original_score} to {max_score}")
+            elif confidence > 0.50:
+                boosted_score = max(0, max_score - 1)
+                evaluation["score"] = max(original_score, boosted_score)
+                logger.info(f"Confidence {confidence:.2f} > 0.50: Boosted score from {original_score} to {evaluation['score']}")
+            elif confidence > 0.30:
+                boosted_score = max_score / 2.0
+                evaluation["score"] = max(original_score, boosted_score)
+                logger.info(f"Confidence {confidence:.2f} > 0.30: Boosted score from {original_score} to {evaluation['score']}")
+            elif confidence > 0.20:
+                boosted_score = max(0, (max_score / 2.0) - 1.0)
+                evaluation["score"] = max(original_score, boosted_score)
+                logger.info(f"Confidence {confidence:.2f} > 0.20: Boosted score from {original_score} to {evaluation['score']}")
         
         evaluation["confidence"] = confidence
         evaluation["metadata"] = {
@@ -282,7 +348,9 @@ class EvaluationService:
             "provider": provider,
             "confidence": confidence,
             "system_type": system_type,
-            "academic_level": effective_level
+            "academic_level": effective_level,
+            "question_type": question_type,
+            "binary_scoring": is_binary
         }
         
         logger.info(f"✅ Score: {evaluation['score']}/{max_score}, Confidence: {confidence:.2f}")
@@ -290,8 +358,13 @@ class EvaluationService:
     
     def _create_system_instruction(self, subject: str, max_score: int, 
                                   system_type: str = "general", academic_level: str = None, 
-                                  class_level: str = "12") -> str:
-        """Create structured system instruction for Gemini prompt prefix caching"""
+                                  class_level: str = "12", question_type: str = "") -> str:
+        """Create structured system instruction for Gemini prompt prefix caching.
+
+        When question_type is a binary type (MCQ, True/False, Fill in the Blank,
+        Assertion-Reasoning, Match the Following), strict rules are injected telling
+        the LLM to score ONLY 0 or max_score — no partial credit.
+        """
         correctness = round(max_score * 0.5, 1)
         completeness = round(max_score * 0.3, 1)
         understanding = round(max_score - correctness - completeness, 1)
@@ -300,6 +373,8 @@ class EvaluationService:
         system_lower = str(system_type or "general").lower()
         system_display = str(system_type or "General Academic").strip().title()
         
+        is_binary = self._is_binary_question_type(question_type)
+
         if any(keyword in system_lower for keyword in ["university", "college", "higher_ed", "engineering", "undergraduate", "postgraduate"]):
             evaluator_role = f"an expert University Professor and Examiner in {subject} (Academic Level: {level_str})"
             grading_guidance = (
@@ -326,9 +401,27 @@ class EvaluationService:
                 "Reward valid points and provide clear, actionable feedback."
             )
 
+        # ── STRICT BINARY OVERRIDE for MCQ-family questions ──
+        binary_rules = ""
+        if is_binary:
+            grading_guidance = (
+                f"This is a {question_type} question. "
+                "Scoring is STRICTLY BINARY: award FULL marks if the student's answer is correct, "
+                "or ZERO marks if it is incorrect. There is absolutely NO partial credit. "
+                "Do not be lenient. Compare the student's selected option/answer exactly against "
+                "the correct answer from the marking scheme or reference material."
+            )
+            binary_rules = f"""
+CRITICAL SCORING RULE — {question_type.upper()}:
+- The score MUST be either 0 or {max_score}. No other value is acceptable.
+- If the student selected the wrong option or wrote an incorrect answer, score MUST be 0.
+- Do NOT award any marks for 'partial understanding' or 'related concepts'.
+- An incorrect MCQ/True-False/Fill-in-the-blank answer is ALWAYS 0 marks.
+"""
+
         return f"""You are {evaluator_role}.
 Guidance: {grading_guidance}
-
+{binary_rules}
 Evaluate the student answer against the reference material and marking scheme.
 Output ONLY valid JSON matching this schema:
 {{
@@ -457,14 +550,20 @@ Return ONLY valid JSON without markdown code fences or conversational prose."""
         
         return round(min(sum(factors), 1.0), 2)
     
-    def _create_fallback_evaluation(self, max_score: int, error: str) -> Dict:
-        """Fallback evaluation"""
+    def _create_fallback_evaluation(self, max_score: int, error: str, question_type: str = "") -> Dict:
+        """Create a fallback evaluation when the LLM call fails.
+
+        For binary question types, the fallback score is 0 (no benefit of doubt).
+        For descriptive types, the fallback is max_score // 2 for manual review.
+        """
+        is_binary = self._is_binary_question_type(question_type)
+        fallback_score = 0 if is_binary else max_score // 2
         return {
-            "score": max_score // 2,
+            "score": fallback_score,
             "score_breakdown": {
-                "correctness": max_score // 4,
-                "completeness": max_score // 6,
-                "understanding": max_score // 4
+                "correctness": 0 if is_binary else max_score // 4,
+                "completeness": 0 if is_binary else max_score // 6,
+                "understanding": 0 if is_binary else max_score // 4
             },
             "correct_points": ["Unable to analyze automatically"],
             "errors": [{"what": "Evaluation failed", "why": error, "impact": "Manual review needed"}],
@@ -472,8 +571,8 @@ Return ONLY valid JSON without markdown code fences or conversational prose."""
             "correct_answer_should_include": ["Review textbook"],
             "improvement_guidance": [{"suggestion": "Manual review", "resource": "Textbook", "practice": "Practice"}],
             "overall_feedback": "Manual teacher review recommended.",
-            "confidence": 0.3,
-            "metadata": {"error": True, "error_message": error}
+            "confidence": 0.1 if is_binary else 0.3,
+            "metadata": {"error": True, "error_message": error, "question_type": question_type, "binary_scoring": is_binary}
         }
 
 

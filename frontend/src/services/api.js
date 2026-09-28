@@ -302,8 +302,8 @@ export const downloadSubmissionReport = async (submissionId, filename = null) =>
  * ───────────────────────────────────────────────────────────────────────────── */
 export const getEvaluationPresets = () => api.get('/evaluation/presets');
 
-export const evaluateDirect = (formData, config = {}) => {
-  return api.post('/evaluation/evaluate', formData, {
+export const extractQuestionPaper = (formData, config = {}) => {
+  return api.post('/evaluation/extract-question-paper', formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
@@ -311,9 +311,138 @@ export const evaluateDirect = (formData, config = {}) => {
   });
 };
 
+export const evaluateDirect = (formData, config = {}) => {
+  return api.post('/evaluation/evaluate', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+    timeout: 300000, // 5 minutes timeout for multi-question evaluations
+    ...config,
+  });
+};
+
+/**
+ * Real-time SSE Evaluation Stream Reader
+ * Connects to /api/evaluation/evaluate-stream and processes real-time chunking,
+ * normalization, vector retrieval, and grading telemetry.
+ */
+export const evaluateDirectStream = async (formData, { onEvent, onComplete, onError, signal } = {}) => {
+  const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+  const headers = {};
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const endpointUrl = `${API_BASE_URL}/evaluation/evaluate-stream`;
+
+  try {
+    const response = await fetch(endpointUrl, {
+      method: 'POST',
+      headers,
+      body: formData,
+      signal,
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      let errorDetail = `Server responded with ${response.status}`;
+      try {
+        const parsedErr = JSON.parse(errText);
+        if (parsedErr.detail) errorDetail = parsedErr.detail;
+      } catch (e) {
+        if (errText) errorDetail = errText;
+      }
+      throw new Error(errorDetail);
+    }
+
+    if (!response.body) {
+      throw new Error('ReadableStream not supported by browser environment.');
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let buffer = '';
+    let completedResult = null;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const blocks = buffer.split('\n\n');
+      buffer = blocks.pop() || ''; // Keep partial line in buffer
+
+      for (const block of blocks) {
+        const trimmed = block.trim();
+        if (!trimmed) continue;
+
+        for (const line of trimmed.split('\n')) {
+          if (line.startsWith('data: ')) {
+            const jsonStr = line.slice(6).trim();
+            if (!jsonStr) continue;
+
+            try {
+              const eventData = JSON.parse(jsonStr);
+              if (onEvent) onEvent(eventData);
+
+              if (eventData.stage === 'completed' && eventData.result) {
+                completedResult = eventData.result;
+              } else if (eventData.stage === 'error') {
+                throw new Error(eventData.message || 'Evaluation pipeline encountered an error.');
+              }
+            } catch (parseErr) {
+              if (parseErr.message && !parseErr.message.includes('JSON')) {
+                throw parseErr;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    if (completedResult) {
+      if (onComplete) onComplete(completedResult);
+      return completedResult;
+    } else {
+      throw new Error('Stream completed without delivering final evaluation payload.');
+    }
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      return null;
+    }
+    const msg = err.message || 'An error occurred during evaluation streaming.';
+    if (onError) onError(msg);
+    throw err;
+  }
+};
+
 export const overrideEvaluationScore = (data) => api.post('/evaluation/override', data);
 
+/* ─────────────────────────────────────────────────────────────────────────────
+ * EVALUATION HISTORY & ARCHIVE ENDPOINTS (/api/evaluation/history)
+ * ───────────────────────────────────────────────────────────────────────────── */
+export const getEvaluationHistory = (params = {}) => api.get('/evaluation/history', { params });
+export const getEvaluationHistoryDetails = (id) => api.get(`/evaluation/history/${id}`);
+export const deleteEvaluationHistory = (id) => api.delete(`/evaluation/history/${id}`);
+export const clearEvaluationHistory = () => api.delete('/evaluation/history');
+
 export const getSystemHealth = () => api.get('/health');
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * REAL TEXTBOOK VECTOR CHUNKING & RAG STUDIO ENDPOINTS (/api/textbooks)
+ * ───────────────────────────────────────────────────────────────────────────── */
+export const getTextbookStats = () => api.get('/textbooks/stats');
+export const getTextbookCatalog = () => api.get('/textbooks');
+export const getTextbookChunks = (textbookId) => api.get(`/textbooks/${textbookId}/chunks`);
+export const deleteIndexedTextbook = (textbookId) => api.delete(`/textbooks/${textbookId}`);
+export const chunkAndIngestTextbook = (formData, config = {}) => {
+  return api.post('/textbooks/chunk-and-ingest', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    ...config,
+  });
+};
+export const getDiscoveredTextbooks = () => api.get('/textbooks/discovered');
+export const ingestDiscoveredTextbook = (payload) => api.post('/textbooks/ingest-discovered', payload);
 
 export const downloadBlob = (blob, filename) => {
   if (typeof window === 'undefined') return;
