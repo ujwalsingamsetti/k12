@@ -277,12 +277,15 @@ export default function Navbar() {
         <div className="flex justify-between items-center h-16">
           {/* Logo / Brand */}
           <button onClick={handleBrandClick} className="flex items-center gap-2.5 group">
-            <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-indigo-600 via-violet-600 to-teal-400 flex items-center justify-center shadow-md group-hover:scale-105 transition-transform duration-300">
-              <TbSchool size={20} className="text-white" />
+            <img src="/logo.png" alt="Logo" className="w-10 h-10 rounded-xl object-contain border border-slate-200 bg-white p-0.5 shadow-sm group-hover:scale-105 transition-transform duration-300" />
+            <div className="flex flex-col text-left">
+              <span className="text-sm font-black text-slate-900 dark:text-slate-100 tracking-tight leading-tight uppercase">
+                Context-Aware Automated Grading
+              </span>
+              <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 tracking-wide uppercase">
+                Qdrant Vector Search & LLM
+              </span>
             </div>
-            <span className="text-lg font-black text-slate-900 dark:text-slate-100 tracking-tight">
-              K12 <span className="bg-gradient-to-r from-indigo-600 to-teal-500 bg-clip-text text-transparent">Evaluator</span>
-            </span>
           </button>
 
           {/* Right Controls */}

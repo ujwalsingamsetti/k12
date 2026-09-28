@@ -5,10 +5,8 @@ export default function Footer() {
     <footer className="border-t border-slate-200/80 dark:border-slate-800/80 bg-white/50 dark:bg-slate-900/50 backdrop-blur-md py-8 mt-auto">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs font-semibold">
-          <div className="w-6 h-6 rounded-lg bg-indigo-600/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
-            <TbSchool size={15} />
-          </div>
-          <span>K12 Evaluator Enterprise · Precision AI Answer Grading</span>
+          <img src="/logo.png" alt="Logo" className="w-6 h-6 rounded-md object-contain border border-slate-200" />
+          <span>Context-Aware Automated Grading of Written Exams Using Qdrant Vector Search & LLM</span>
         </div>
 
         <div className="flex items-center gap-6 text-xs font-medium text-slate-400 dark:text-slate-500">

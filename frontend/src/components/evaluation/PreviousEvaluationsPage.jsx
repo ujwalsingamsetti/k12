@@ -91,32 +91,30 @@ const PreviousEvaluationsPage = () => {
           {/* Logo & System Brand */}
           <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
             <Box
+              component="img"
+              src="/logo.png"
+              alt="Application Logo"
               sx={{
-                width: 40,
-                height: 40,
+                width: 44,
+                height: 44,
                 borderRadius: 2.5,
-                background: 'linear-gradient(135deg, #1E40AF 0%, #2563EB 100%)',
-                color: '#FFFFFF',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: 900,
-                fontSize: '1.25rem',
-                boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
+                objectFit: 'contain',
+                p: 0.5,
+                bgcolor: '#FFFFFF',
+                border: '1px solid #E2E8F0',
+                boxShadow: '0 4px 12px rgba(37, 99, 235, 0.15)',
                 cursor: 'pointer',
               }}
               onClick={() => navigate('/setup')}
-            >
-              <SchoolIcon sx={{ fontSize: 24 }} />
-            </Box>
+            />
 
             <Box>
               <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                <Typography variant="h6" sx={{ fontSize: '1rem', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.01em' }}>
-                  Examination Evaluation Studio
+                <Typography variant="h6" sx={{ fontSize: '0.875rem', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.01em', textTransform: 'uppercase' }}>
+                  Context-Aware Automated Grading of Written Exams
                 </Typography>
                 <Chip
-                  label="B.E. Capstone 2026"
+                  label="Qdrant + LLM"
                   size="small"
                   sx={{
                     height: 20,
@@ -128,8 +126,8 @@ const PreviousEvaluationsPage = () => {
                   }}
                 />
               </Stack>
-              <Typography variant="caption" sx={{ color: '#64748B', display: { xs: 'none', md: 'block' } }}>
-                Multimodal OCR • Multi-Page Collation • Qdrant Vector DB • DeepSeek-V3 Reasoning
+              <Typography variant="caption" sx={{ color: '#2563EB', fontWeight: 700, fontSize: '0.6875rem', display: { xs: 'none', md: 'block' } }}>
+                USING QDRANT VECTOR SEARCH AND LARGE LANGUAGE MODEL
               </Typography>
             </Box>
           </Stack>
@@ -246,10 +244,10 @@ const PreviousEvaluationsPage = () => {
           sx={{ maxWidth: 1440, mx: 'auto', justifyContent: 'space-between', alignItems: 'center' }}
         >
           <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600 }}>
-            Knowledge Graph-Augmented RAG Examination Evaluator • Sathyabama Institute of Science and Technology • 2026
+            CONTEXT-AWARE AUTOMATED GRADING OF WRITTEN EXAMS USING QDRANT VECTOR SEARCH AND LARGE LANGUAGE MODEL • Sathyabama Institute of Science and Technology • 2026
           </Typography>
           <Typography variant="caption" sx={{ color: '#94A3B8' }}>
-            Production Build 2.4 • PostgreSQL Persistent Evaluation Archive
+            Qdrant Vector DB • DeepSeek-V3 / Gemini • PostgreSQL Persistent Archive
           </Typography>
         </Stack>
       </Box>

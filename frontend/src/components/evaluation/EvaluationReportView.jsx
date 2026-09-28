@@ -295,26 +295,26 @@ const EvaluationReportView = ({
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1.5, mb: 1 }}>
             <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
               <Box
+                component="img"
+                src="/logo.png"
+                alt="Application Logo"
                 sx={{
-                  width: 38,
-                  height: 38,
+                  width: 44,
+                  height: 44,
                   borderRadius: 2.5,
-                  bgcolor: '#EFF6FF',
-                  color: '#1E40AF',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
+                  p: 0.5,
+                  bgcolor: '#FFFFFF',
                   border: '1px solid #BFDBFE',
+                  objectFit: 'contain',
+                  boxShadow: '0 2px 8px rgba(37,99,235,0.1)',
                 }}
-              >
-                <SchoolIcon sx={{ fontSize: 22 }} />
-              </Box>
+              />
               <Box>
-                <Typography variant="h6" sx={{ fontSize: '1.05rem', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.01em' }}>
-                  Examination Evaluation Studio
+                <Typography variant="h6" sx={{ fontSize: '0.95rem', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.01em', textTransform: 'uppercase' }}>
+                  Context-Aware Automated Grading of Written Exams
                 </Typography>
-                <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600 }}>
-                  Autonomous K-12 Answer Evaluation & Pedagogical Diagnostic Engine
+                <Typography variant="caption" sx={{ color: '#2563EB', fontWeight: 700, display: 'block' }}>
+                  USING QDRANT VECTOR SEARCH AND LARGE LANGUAGE MODEL
                 </Typography>
               </Box>
             </Stack>
