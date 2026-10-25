@@ -1,292 +1,389 @@
-# Industry-Level System Architecture Specification
-## Context-Aware Automated Grading of Written Exams Using Qdrant Vector Search & Large Language Models
+# Publication-Grade System Architecture Specification
+## Context-Aware Automated Grading of Written Examinations Using Vector Search and Large Language Models
 
 ---
 
-### Executive Architectural Overview
+### Abstract & Architectural Paradigm
 
-The **Context-Aware Automated Exam Grading System** is an enterprise-grade educational technology and evaluation platform engineered to autonomously ingest, transcribe, collate, and evaluate handwritten student examination answer booklets. The system guarantees pedagogical rigor, curriculum grounding, deterministic scoring, and granular diagnostic feedback across any educational tier—from K-12 school boards (CBSE, ICSE, Cambridge) to higher education university faculties and competitive examinations.
+Automating the grading of handwritten student examination booklets requires solving non-trivial multidisciplinary challenges across computer vision, natural language processing, semantic information retrieval, and deterministic reasoning. Conventional automated assessment systems suffer from three fundamental bottlenecks:
+1. **Transcriptive and Layout Brittleness**: Handwriting variability, ink degradation, multi-column answer layouts, and scattered answer fragments across non-consecutive pages defeat standard optical character recognition (OCR) and naive regex splitters.
+2. **Ungrounded Hallucinations and Syllabus Drift**: Large language models evaluated in isolation hallucinate out-of-syllabus criteria or apply college-level expectations to secondary school students.
+3. **Scoring Indeterminism and Leniency Flaws**: Probabilistic generation leads to score variance and unmerited partial credit on objective questions (e.g., awarding partial marks for incorrect multiple-choice choices).
 
-The platform eliminates the primary failure modes of conventional automated grading systems:
-1. **OCR Fragility & Layout Fragmentation**: Solved via dual-engine vision processing (OpenCV enhancement + Google Cloud Vision with automated Gemini Multimodal Vision circuit breaker fallback) and LLM-guided multi-page collation (`AnswerNormalizer`).
-2. **LLM Hallucination & Out-of-Syllabus Grading Penalties**: Solved via dense vector grounding in Qdrant with HNSW cosine similarity search pre-filtered strictly by academic subject and grade level.
-3. **Subjective Scoring Drift & MCQ Leniency**: Solved via deterministic multi-layer binary scoring enforcement for objective questions (strict 0 or full marks) alongside step-wise multi-criteria rubric evaluation for descriptive questions.
+This paper presents the formal system architecture of a **Context-Aware Automated Examination Grading System**. The architecture integrates:
+* An **Advanced Image Preprocessing and Dual-Engine Vision Pipeline** with automated circuit-breaking between a Cloud Vision OCR service and a Multimodal Foundation Model.
+* A **Semantic Normalization and Multi-Page Collation Agent** that repairs transcriptions, consolidates fragmented answers, and marks unattempted questions deterministically.
+* A **Curriculum-Grounded Dense Vector Retrieval (RAG) Subsystem** utilizing sentence transformers, in-memory LRU embedding/context caches, and a vector database with strict payload metadata filtering ($\text{Subject} \land \text{Academic Level}$).
+* A **Dual-Mode Step-Wise Evaluation Engine** that enforces deterministic binary scoring (0 or full marks) on objective questions while applying a three-tier weighted criteria rubric (Factual 50%, Completeness 30%, Conceptual 20%) on descriptive responses.
+* A **Persistent Audit and Human-in-the-Loop Override Tier** backed by a relational database management system.
 
 ---
 
-### End-to-End System Architecture Diagram
-
-![System Architecture Diagram](system_architecture.png)
+### Detailed Publication-Grade System Architecture Diagram
 
 ```mermaid
 flowchart TD
-    %% Industry-Standard Minimalistic Enterprise Palette
-    classDef clientLayer fill:#F8FAFC,stroke:#334155,stroke-width:2px,color:#0F172A,font-weight:bold;
-    classDef gatewayLayer fill:#FFFFFF,stroke:#475569,stroke-width:1.5px,color:#0F172A;
-    classDef processingEngine fill:#FFFFFF,stroke:#334155,stroke-width:1.5px,color:#0F172A;
-    classDef ragEngine fill:#F8FAFC,stroke:#1E293B,stroke-width:1.5px,color:#0F172A;
-    classDef llmEngine fill:#FFFFFF,stroke:#2563EB,stroke-width:1.5px,color:#1E3A8A;
-    classDef storageLayer fill:#F1F5F9,stroke:#475569,stroke-width:1.5px,color:#0F172A;
-    classDef fallbackCircuit fill:#FEFCE8,stroke:#CA8A04,stroke-width:1.5px,color:#854D0E;
+    %% Formal Academic Minimalist Palette (Grayscale, Charcoal, Muted Steel Slate)
+    classDef clientLayer fill:#F8FAFC,stroke:#1E293B,stroke-width:2px,color:#0F172A,font-weight:bold;
+    classDef gatewayLayer fill:#FFFFFF,stroke:#334155,stroke-width:1.5px,color:#0F172A;
+    classDef processLayer fill:#FFFFFF,stroke:#475569,stroke-width:1.5px,color:#0F172A;
+    classDef llmAgentLayer fill:#F8FAFC,stroke:#2563EB,stroke-width:1.5px,color:#1E3A8A;
+    classDef storageLayer fill:#F1F5F9,stroke:#334155,stroke-width:1.5px,color:#0F172A;
+    classDef circuitBreaker fill:#FEFCE8,stroke:#B45309,stroke-width:1.5px,color:#78350F;
+    classDef decisionDiamond fill:#FFFFFF,stroke:#0F172A,stroke-width:1.5px,color:#0F172A;
 
-    %% 1. CLIENT TIER (Single Unified Block as Specified)
-    subgraph Presentation_Tier ["Presentation Tier"]
-        CLIENT["Web Client Application<br/>(React 19 • MUI v9 • Vite • Real-Time SSE Dashboard • Textbook Studio • Historical Archive)"]:::clientLayer
+    %% ─────────────────────────────────────────────────────────────
+    %% 1. PRESENTATION TIER (Single Unified Block)
+    %% ─────────────────────────────────────────────────────────────
+    subgraph Tier_Client ["Tier 1: Presentation & Client Interface Layer"]
+        CLIENT_APP["Unified Web Client Interface<br/>(Single-Page Application Architecture • Multi-Question Exam Setup • Multipart Answer Upload • Server-Sent Events Real-Time Progress Stream • Interactive Diagnostic Report Viewer • Curriculum Vector Management Studio • Historical Archive & Teacher Override Console)"]:::clientLayer
     end
 
-    %% 2. API GATEWAY & ROUTING
-    subgraph Gateway_Tier ["API Gateway & Controller Tier (FastAPI / Uvicorn ASGI)"]
-        GATEWAY["FastAPI Application Router<br/>(CORS • SlowAPI Rate Limiter • Global Exception Handler)"]:::gatewayLayer
-        ROUTE_EVAL["/api/evaluation/evaluate<br/>(Multi-Question Evaluator)"]:::gatewayLayer
-        ROUTE_EXTRACT["/api/evaluation/extract-question-paper<br/>(Board-Agnostic Parser)"]:::gatewayLayer
-        ROUTE_TEXTBOOK["/api/textbooks/*<br/>(Curriculum Ingestion API)"]:::gatewayLayer
-        ROUTE_HISTORY["/api/evaluation/history<br/>(PostgreSQL Archive API)"]:::gatewayLayer
-    end
-
-    %% 3. MULTIMODAL INGESTION & VISION TIER
-    subgraph Ingestion_Vision_Tier ["Multimodal Ingestion & Vision Preprocessing Tier"]
-        INPUT_DISPATCHER{"Input Document<br/>Classifier"}:::processingEngine
-        DIGITAL_PARSER["PyMuPDF Native Text Parser<br/>(Fast Path: &lt;50ms)"]:::processingEngine
-        IMAGE_PREPROCESSOR["OpenCV Vision Pipeline<br/>(Grayscale • CLAHE • Denoising • Auto-Deskew)"]:::processingEngine
+    %% ─────────────────────────────────────────────────────────────
+    %% 2. API GATEWAY & APPLICATION CONTROLLER TIER
+    %% ─────────────────────────────────────────────────────────────
+    subgraph Tier_Gateway ["Tier 2: Asynchronous API Gateway & Controller Layer"]
+        ASGI_SERVER["Asynchronous Server Gateway Interface (ASGI Engine / HTTP/2)"]:::gatewayLayer
+        AUTH_RATE_GUARD["Security, CORS & Token-Bucket Rate Limiter"]:::gatewayLayer
+        DISPATCHER["Application Route Dispatcher"]:::gatewayLayer
         
-        GCV_ENGINE["Google Cloud Vision API<br/>(Handwriting & Document Text Detection)"]:::processingEngine
-        CIRCUIT_BREAKER{"Vision API<br/>Active?"}:::fallbackCircuit
-        GEMINI_VISION["Google Gemini Multimodal Vision<br/>(Resilient Secondary Fallback OCR)"]:::fallbackCircuit
+        ENDPOINT_EVAL["POST /api/evaluation/evaluate<br/>(Batch Pipeline & SSE Stream)"]:::gatewayLayer
+        ENDPOINT_EXTRACT["POST /api/evaluation/extract-question-paper<br/>(Universal Exam Schema Extractor)"]:::gatewayLayer
+        ENDPOINT_TEXTBOOK["POST & GET /api/textbooks/*<br/>(Vector Ingestion & Chunk Telemetry)"]:::gatewayLayer
+        ENDPOINT_HISTORY["GET & POST /api/evaluation/history<br/>(Archival Query & Audit Log)"]:::gatewayLayer
+        ENDPOINT_OVERRIDE["POST /api/evaluation/override<br/>(Human-in-the-Loop Calibration)"]:::gatewayLayer
+    end
+
+    %% ─────────────────────────────────────────────────────────────
+    %% 3. MULTIMODAL INGESTION & COMPUTER VISION PREPROCESSING TIER
+    %% ─────────────────────────────────────────────────────────────
+    subgraph Tier_Vision ["Tier 3: Multimodal Ingestion & Computer Vision Preprocessing Tier"]
+        INPUT_CLASSIFIER{"Input Stream Classifier<br/>(MIME & Format Audit)"}:::decisionDiamond
         
-        DIAGRAM_ENGINE["Diagram & Spatial Detector<br/>(OpenCV Contours + Question Bounding Boxes)"]:::processingEngine
-    end
-
-    %% 4. NORMALIZATION & COLLATION TIER
-    subgraph Normalization_Tier ["Semantic Normalization & Multi-Page Collation Tier"]
-        RAW_TEXT_STREAM["Raw OCR Text Stream & Bounding Boxes"]:::processingEngine
-        NORMALIZER["AnswerNormalizer Engine<br/>(Spell/Math Symbol Repair • Multi-Page Collation)"]:::processingEngine
-        REGEX_PARSER["AnswerParser Heuristic Fallback<br/>(15+ Numbering Formats • Pure MCQ Mapping)"]:::processingEngine
-        COLLATED_MAP["Question-to-Answer Canonical Map<br/>(Explicit Handling for Unattempted Questions)"]:::processingEngine
-    end
-
-    %% 5. VECTOR RETRIEVAL (RAG) TIER
-    subgraph Vector_RAG_Tier ["Curriculum-Grounded Vector Search (RAG) Tier"]
-        RAG_COORDINATOR["RAGService Coordinator<br/>(Targeted Q-by-Q Query Formulator)"]:::ragEngine
-        EMBED_CACHE["In-Memory LRU Embedding Cache<br/>(2048 Entries • 0ms Cache Hit Latency)"]:::ragEngine
-        EMBEDDER["SentenceTransformers Engine<br/>(all-MiniLM-L6-v2 / all-mpnet-base-v2)"]:::ragEngine
-        QDRANT_ENGINE["Qdrant Vector Database Engine<br/>(HNSW Indexing • Cosine Metric • Payload Filter)"]:::storageLayer
-    end
-
-    %% 6. MULTI-PROVIDER LLM EVALUATION & SCORING TIER
-    subgraph Scoring_LLM_Tier ["Evaluation & Pedagogical Diagnostic Tier"]
-        EVAL_CONTROLLER["EvaluationService Controller<br/>(Persona Adaptation: University / Board / Exam)"]:::llmEngine
-        SCORING_CLASSIFIER{"Question<br/>Type?"}:::llmEngine
+        NATIVE_PDF_PARSER["Native Digital PDF Text Extractor<br/>(Character Stream Probe: &gt;200 chars &rarr; Fast Path &lt;50ms)"]:::processLayer
+        PAGE_RASTERIZER["Document Page Rasterizer<br/>(PDF to 300 DPI High-Resolution Image Buffers)"]:::processLayer
         
-        BINARY_ENFORCER["Strict Binary Scoring Guard<br/>(MCQ / True-False / Fill-in-Blank: 0 or Full Marks)"]:::llmEngine
-        DESCRIPTIVE_SCORER["Step-Wise Rubric Scorer<br/>(Factual 50% • Structural 30% • Conceptual 20%)"]:::llmEngine
+        CV_RESIZE["Spatial Scale Normalizer<br/>(Interpolation to 2500px Standardized Width)"]:::processLayer
+        CV_DENOISE["Fast Non-Local Means Denoising<br/>(Grain Texture & Reverse-Ink Suppression)"]:::processLayer
+        CV_CLAHE["Contrast-Limited Adaptive Histogram Equalization<br/>(Faint Pencil & Heavy Ink Balancing)"]:::processLayer
+        CV_ADAPTIVE["Adaptive Gaussian Thresholding<br/>(Foreground Stroke & Ruled-Line Separation)"]:::processLayer
+        CV_DESKEW["In-Memory Hough Line Transform Deskewing<br/>(Orientation Angle &theta; Detection & Affine Correction &plusmn;0.5&deg;-15&deg;)"]:::processLayer
         
-        PRIMARY_LLM["Primary: DeepSeek-V3 Reasoning Engine<br/>(AsyncOpenAI Client • Strict JSON Output)"]:::llmEngine
-        FALLBACK_LLM["Fallback: Google Gemini 1.5 Flash<br/>(google-genai Client • Automated Circuit Breaker)"]:::fallbackCircuit
+        OCR_PRIMARY["Primary Cloud Vision OCR Engine<br/>(Word/Line Geometry & Dense Transcription)"]:::processLayer
+        OCR_CHECK{"Primary OCR<br/>Service Healthy?"}:::circuitBreaker
+        OCR_FALLBACK_VLM["Secondary Multimodal Foundation Model<br/>(Verbatim Handwriting & Formula Extraction Fallback)"]:::circuitBreaker
         
-        DIAGNOSTIC_SYNTHESIZER["Diagnostic Feedback Synthesizer<br/>(Misconceptions • Missing Steps • Study Guidance)"]:::llmEngine
+        DOMAIN_LEXICON["Domain Vocabulary Spell-Guard<br/>(Protection for Specialized Science/Math Lexicons)"]:::processLayer
+        DIAGRAM_DETECTOR["Spatial Diagram & Contour Extractor<br/>(OpenCV Geometric Analysis + Object Bounding Boxes)"]:::processLayer
     end
 
-    %% 7. PERSISTENCE & DATA STORAGE TIER
-    subgraph Persistence_Tier ["Persistence & Analytics Tier"]
-        PG_DB[("PostgreSQL Database<br/>(saved_evaluations Table • Full Audit Log)")]:::storageLayer
-        DISK_STORAGE[("Local Filesystem Storage<br/>(PDFs • Preprocessed Images • Ingestion Manifest)")]:::storageLayer
+    %% ─────────────────────────────────────────────────────────────
+    %% 4. SEMANTIC NORMALIZATION & MULTI-PAGE COLLATION TIER
+    %% ─────────────────────────────────────────────────────────────
+    subgraph Tier_Collation ["Tier 4: Semantic Normalization & Multi-Page Collation Agent Tier"]
+        RAW_PAGES_AGGREGATOR["Multi-Page Raw Transcription Aggregator"]:::processLayer
+        
+        NORMALIZER_LLM["Semantic Normalization & Collation Agent<br/>(Call Foundation LLM via Constrained System Instruction)"]:::llmAgentLayer
+        NORMALIZER_TASKS["Agent Responsibilities:<br/>1. Repair OCR Symbol Deletions & Broken Superscripts/Subscripts<br/>2. Collate Scattered Answer Fragments Across Non-Consecutive Pages<br/>3. Reconstruct Multi-Line Mathematical Equations & Proofs<br/>4. Detect & Flag Unattempted Questions Deterministically"]:::processLayer
+        
+        REGEX_PARSER_FALLBACK["Heuristic Regex Answer Parser Fallback<br/>(15+ Numbering Conventions: Q1., Ans 2, 1.(a), Pure MCQ)"]:::processLayer
+        CANONICAL_ANSWER_MAP["Canonical Question-Answer Entity Map<br/>(Structured Question-by-Question Cleaned Ingestion Payloads)"]:::processLayer
     end
 
-    %% Relationships & Data Flow
-    CLIENT -->|Multipart Form-Data / SSE| GATEWAY
-    GATEWAY --> ROUTE_EVAL
-    GATEWAY --> ROUTE_EXTRACT
-    GATEWAY --> ROUTE_TEXTBOOK
-    GATEWAY --> ROUTE_HISTORY
+    %% ─────────────────────────────────────────────────────────────
+    %% 5. CURRICULUM-GROUNDED VECTOR RETRIEVAL (RAG) TIER
+    %% ─────────────────────────────────────────────────────────────
+    subgraph Tier_RAG ["Tier 5: Curriculum-Grounded Vector Search (RAG) Tier"]
+        TARGETED_QUERY_GEN["Targeted Query Formulator<br/>(Question Prompt + Student Answer Focus Window)"]:::processLayer
+        
+        LRU_EMBED_CACHE["In-Memory LRU Vector Cache<br/>(Capacity: 2048 Vectors • 0ms Cache Hit)"]:::storageLayer
+        LRU_CONTEXT_CACHE["In-Memory LRU Context Cache<br/>(Capacity: 512 Results • Exact Match Hit)"]:::storageLayer
+        
+        EMBED_MODEL["Dense Embedding Foundation Model<br/>(High-Dimensional Semantic Vector Encoding)"]:::processLayer
+        
+        FILTER_GENERATOR["Strict Payload Filter Synthesizer<br/>(Subject == NormSubject &and; AcademicLevel == NormLevel)"]:::processLayer
+        
+        VECTOR_DATABASE[("Vector Database Engine<br/>(HNSW Graph Indexing • Cosine Metric • Isolated Collections)")]:::storageLayer
+        CURRICULUM_CHUNKS["Authoritative Curriculum Chunks<br/>(Punctuation-Aware Semantic Chunks • 800 Chars / 150 Overlap)"]:::storageLayer
+    end
 
-    ROUTE_EVAL --> INPUT_DISPATCHER
-    INPUT_DISPATCHER -->|Digital PDF| DIGITAL_PARSER
-    INPUT_DISPATCHER -->|Scanned PDF / Image| IMAGE_PREPROCESSOR
+    %% ─────────────────────────────────────────────────────────────
+    %% 6. MULTI-CRITERIA STEP-WISE EVALUATION & SCORING TIER
+    %% ─────────────────────────────────────────────────────────────
+    subgraph Tier_Evaluation ["Tier 6: Multi-Criteria Step-Wise Evaluation & Scoring Tier"]
+        PARALLEL_ORCHESTRATOR["Parallel Async Evaluation Orchestrator<br/>(Concurrent Task Dispatch per Question)"]:::processLayer
+        PERSONA_SELECTOR["Academic Persona & Demeanor Synthesizer<br/>(University Rigor • Competitive Analytical • Board Step-Marking)"]:::processLayer
+        
+        QUESTION_CLASSIFIER{"Question<br/>Taxonomy Type?"}:::decisionDiamond
+        
+        BINARY_GATE["Strict Binary Scoring Enforcer<br/>(Objective Types: MCQ, True/False, Assertion-Reason, Fill-in-Blank)"]:::llmAgentLayer
+        BINARY_RULES["Strict Binary Constraints:<br/>&bull; Score = Max Score iff Answer == Marking Rubric Exactly<br/>&bull; Score = 0 for Any Incorrect Option / Distractor<br/>&bull; Zero Partial Credit • Suppression of Confidence Leniency Boost"]:::processLayer
+        
+        DESCRIPTIVE_GATE["Multi-Criteria Step-Wise Rubric Scorer<br/>(Subjective Types: Short Answer, Long Answer, Derivations, Diagrams)"]:::llmAgentLayer
+        RUBRIC_BREAKDOWN["Tri-Partite Criteria Breakdown:<br/>&bull; Factual Correctness: 50% Weight (Scientific Laws, Definitions, Values)<br/>&bull; Structural Completeness: 30% Weight (Logical Steps, Equations, Units)<br/>&bull; Conceptual Understanding: 20% Weight (Principle Application, Soundness)"]:::processLayer
+        
+        EVAL_LLM_PRIMARY["Primary Foundation LLM Inference Engine<br/>(Asynchronous Streaming Client • Strict JSON Schema Output)"]:::llmAgentLayer
+        EVAL_LLM_FALLBACK["Secondary Foundation LLM Fallback Engine<br/>(Automated Failover on Timeout, Quota, or Connection Loss)"]:::circuitBreaker
+        
+        DIAGNOSTIC_ANALYZER["Pedagogical Diagnostic Analyzer<br/>(Misconception Isolation • Missing Concept Identification • Remedial Guidance)"]:::processLayer
+    end
 
-    DIGITAL_PARSER --> RAW_TEXT_STREAM
-    IMAGE_PREPROCESSOR --> CIRCUIT_BREAKER
-    CIRCUIT_BREAKER -->|Normal| GCV_ENGINE
-    CIRCUIT_BREAKER -->|Quota / Fail| GEMINI_VISION
-    IMAGE_PREPROCESSOR --> DIAGRAM_ENGINE
+    %% ─────────────────────────────────────────────────────────────
+    %% 7. PERSISTENCE, AUDITING & ANALYTICS TIER
+    %% ─────────────────────────────────────────────────────────────
+    subgraph Tier_Persistence ["Tier 7: Relational Persistence, Auditability & Human-in-the-Loop Tier"]
+        METRIC_AGGREGATOR["Paper Metric Aggregator<br/>(Total Marks • Percentage • Performance Tiers: Exemplary/Pass/Needs Improvement/Fail)"]:::processLayer
+        
+        RDBMS_STORAGE[("Relational Database Management System<br/>(Table: saved_evaluations • Unique UUID PK • Full JSON Report Audit Trail)")]:::storageLayer
+        BLOB_STORAGE[("Artifact & File Storage<br/>(Source Images, Normalized PDFs, Ingestion Manifests)")]:::storageLayer
+        
+        OVERRIDE_HANDLER["Examiner Manual Override Controller<br/>(Score Calibration • Remark Annotation • Immutable Versioning)"]:::processLayer
+    end
 
-    GCV_ENGINE --> RAW_TEXT_STREAM
-    GEMINI_VISION --> RAW_TEXT_STREAM
-    DIAGRAM_ENGINE -.->|Diagram Metadata| EVAL_CONTROLLER
+    %% ─────────────────────────────────────────────────────────────
+    %% INTER-TIER DATA FLOW & CONTROL WIRING
+    %% ─────────────────────────────────────────────────────────────
+    CLIENT_APP -->|HTTP/2 Multipart Form & SSE Connection| ASGI_SERVER
+    ASGI_SERVER --> AUTH_RATE_GUARD
+    AUTH_RATE_GUARD --> DISPATCHER
+    
+    DISPATCHER --> ENDPOINT_EVAL
+    DISPATCHER --> ENDPOINT_EXTRACT
+    DISPATCHER --> ENDPOINT_TEXTBOOK
+    DISPATCHER --> ENDPOINT_HISTORY
+    DISPATCHER --> ENDPOINT_OVERRIDE
 
-    RAW_TEXT_STREAM --> NORMALIZER
-    NORMALIZER -.->|Fallback Heuristic| REGEX_PARSER
-    NORMALIZER --> COLLATED_MAP
+    ENDPOINT_EVAL --> INPUT_CLASSIFIER
+    INPUT_CLASSIFIER -->|Digital PDF Stream| NATIVE_PDF_PARSER
+    INPUT_CLASSIFIER -->|Scanned Document / Image| PAGE_RASTERIZER
 
-    COLLATED_MAP --> RAG_COORDINATOR
-    RAG_COORDINATOR <--> EMBED_CACHE
-    RAG_COORDINATOR --> EMBEDDER
-    EMBEDDER -->|Dense Vector Embedding| QDRANT_ENGINE
-    QDRANT_ENGINE -->|Top-K Curriculum Context| EVAL_CONTROLLER
+    PAGE_RASTERIZER --> CV_RESIZE
+    CV_RESIZE --> CV_DENOISE
+    CV_DENOISE --> CV_CLAHE
+    CV_CLAHE --> CV_ADAPTIVE
+    CV_ADAPTIVE --> CV_DESKEW
 
-    COLLATED_MAP --> EVAL_CONTROLLER
-    EVAL_CONTROLLER --> SCORING_CLASSIFIER
+    CV_DESKEW --> OCR_CHECK
+    OCR_CHECK -->|Service Available| OCR_PRIMARY
+    OCR_CHECK -->|Service Degradation / Limit| OCR_FALLBACK_VLM
 
-    SCORING_CLASSIFIER -->|Objective / MCQ| BINARY_ENFORCER
-    SCORING_CLASSIFIER -->|Descriptive / Diagram| DESCRIPTIVE_SCORER
+    OCR_PRIMARY --> DOMAIN_LEXICON
+    OCR_FALLBACK_VLM --> DOMAIN_LEXICON
+    CV_DESKEW --> DIAGRAM_DETECTOR
 
-    BINARY_ENFORCER --> PRIMARY_LLM
-    DESCRIPTIVE_SCORER --> PRIMARY_LLM
-    PRIMARY_LLM -.->|API Failure| FALLBACK_LLM
+    NATIVE_PDF_PARSER --> RAW_PAGES_AGGREGATOR
+    DOMAIN_LEXICON --> RAW_PAGES_AGGREGATOR
+    
+    RAW_PAGES_AGGREGATOR --> NORMALIZER_LLM
+    NORMALIZER_LLM --- NORMALIZER_TASKS
+    NORMALIZER_LLM -.->|Heuristic Failover| REGEX_PARSER_FALLBACK
+    NORMALIZER_LLM --> CANONICAL_ANSWER_MAP
 
-    PRIMARY_LLM --> DIAGNOSTIC_SYNTHESIZER
-    FALLBACK_LLM --> DIAGNOSTIC_SYNTHESIZER
+    CANONICAL_ANSWER_MAP --> PARALLEL_ORCHESTRATOR
+    DIAGRAM_DETECTOR -.->|Spatial Bounding Boxes| PARALLEL_ORCHESTRATOR
 
-    DIAGNOSTIC_SYNTHESIZER --> PG_DB
-    ROUTE_EVAL --> DISK_STORAGE
-    ROUTE_HISTORY <--> PG_DB
-    ROUTE_TEXTBOOK <--> QDRANT_ENGINE
-    ROUTE_EVAL -->|Streaming JSON / EventSource| CLIENT
+    PARALLEL_ORCHESTRATOR --> TARGETED_QUERY_GEN
+    TARGETED_QUERY_GEN --> LRU_CONTEXT_CACHE
+    LRU_CONTEXT_CACHE -->|Cache Miss| LRU_EMBED_CACHE
+    LRU_EMBED_CACHE -->|Cache Miss| EMBED_MODEL
+    
+    EMBED_MODEL --> VECTOR_DATABASE
+    FILTER_GENERATOR --> VECTOR_DATABASE
+    VECTOR_DATABASE <--> CURRICULUM_CHUNKS
+    VECTOR_DATABASE -->|Top-K Authoritative Context Chunks| PARALLEL_ORCHESTRATOR
+
+    PARALLEL_ORCHESTRATOR --> PERSONA_SELECTOR
+    PERSONA_SELECTOR --> QUESTION_CLASSIFIER
+
+    QUESTION_CLASSIFIER -->|Objective / Binary Types| BINARY_GATE
+    BINARY_GATE --- BINARY_RULES
+    
+    QUESTION_CLASSIFIER -->|Descriptive / Analytic Types| DESCRIPTIVE_GATE
+    DESCRIPTIVE_GATE --- RUBRIC_BREAKDOWN
+
+    BINARY_GATE --> EVAL_LLM_PRIMARY
+    DESCRIPTIVE_GATE --> EVAL_LLM_PRIMARY
+    EVAL_LLM_PRIMARY -.->|Failover on Timeout/Exception| EVAL_LLM_FALLBACK
+
+    EVAL_LLM_PRIMARY --> DIAGNOSTIC_ANALYZER
+    EVAL_LLM_FALLBACK --> DIAGNOSTIC_ANALYZER
+
+    DIAGNOSTIC_ANALYZER --> METRIC_AGGREGATOR
+    METRIC_AGGREGATOR --> RDBMS_STORAGE
+    DISPATCHER --> BLOB_STORAGE
+    
+    ENDPOINT_OVERRIDE <--> OVERRIDE_HANDLER
+    OVERRIDE_HANDLER <--> RDBMS_STORAGE
+    ENDPOINT_HISTORY <--> RDBMS_STORAGE
+    ENDPOINT_TEXTBOOK <--> VECTOR_DATABASE
+
+    METRIC_AGGREGATOR -->|Server-Sent Events Real-Time Stream / JSON| CLIENT_APP
 ```
 
 ---
 
-### Step-by-Step Execution Sequence Diagram
+### Step-by-Step Execution Lifecycle & Data Flow Sequence
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor User as Client (Web Application)
-    participant API as FastAPI Gateway
-    participant OCR as OCR & Vision Engine
-    participant Norm as AnswerNormalizer
-    participant RAG as Qdrant Vector Engine
-    participant Eval as EvaluationService (DeepSeek / Gemini)
-    participant DB as PostgreSQL Persistence
+    actor Client as Unified Web Client
+    participant Gateway as Asynchronous API Gateway
+    participant Vision as Computer Vision & OCR Pipeline
+    participant Normalizer as Semantic Normalization Agent
+    participant RAG as Vector Search & Embedding Engine
+    participant Eval as Multi-Criteria Evaluation Engine
+    participant DB as Relational Database (Persistence)
 
-    User->>API: POST /api/evaluation/evaluate (Answer Images/PDF + Questions)
-    activate API
-    API-->>User: SSE Event: Pipeline Initialized (5%)
-    
-    API->>OCR: Ingest & Preprocess (Grayscale, CLAHE, Deskew)
-    activate OCR
-    alt Native PDF
-        OCR->>OCR: PyMuPDF Direct Text Extraction (<50ms)
-    else Scanned Document
-        OCR->>OCR: Google Cloud Vision / Gemini Vision Fallback
-        OCR->>OCR: Diagram & Bounding Box Detection
+    Client->>Gateway: POST /api/evaluation/evaluate (Answer Payload + Exam Rubric)
+    activate Gateway
+    Gateway-->>Client: SSE Event: Ingestion Initialized (Stage: init, Progress: 5%)
+
+    Gateway->>Vision: Dispatch Input Streams (Digital PDF vs Raster Images)
+    activate Vision
+    alt Digital PDF Available (>200 native characters)
+        Vision->>Vision: Direct PDF Stream Extraction (<50ms)
+    else Raster Document Scans
+        Vision->>Vision: OpenCV Normalization (Denoise, CLAHE, Hough Deskew)
+        Vision->>Vision: Spatial Diagram & Bounding Box Extraction
+        alt Primary Cloud Vision OCR Active
+            Vision->>Vision: Execute Optical Text Detection
+        else Primary Degraded / Quota Exceeded
+            Vision->>Vision: Trigger Multimodal Foundation Model Fallback
+        end
     end
-    OCR-->>API: Extracted Raw Page Texts + Diagram Metadata
-    deactivate OCR
-    API-->>User: SSE Event: OCR Extraction Complete (35%)
+    Vision-->>Gateway: Raw Page Transcriptions + Spatial Diagram Metadata
+    deactivate Vision
+    Gateway-->>Client: SSE Event: OCR Extraction Complete (Stage: ocr, Progress: 35%)
 
-    API->>Norm: Normalize Text & Collate Multi-Page Fragments
-    activate Norm
-    Norm->>Norm: Repair Broken Equations & Collate Out-of-Order Answers
-    Norm-->>API: Canonical Question-to-Answer Map
-    deactivate Norm
-    API-->>User: SSE Event: Collation Complete (60%)
+    Gateway->>Normalizer: Execute Answer Normalization & Multi-Page Collation
+    activate Normalizer
+    Normalizer->>Normalizer: Call Normalization LLM: Repair OCR Errors & Consolidate Cross-Page Fragments
+    Normalizer->>Normalizer: Deterministically Detect Unattempted Questions
+    Normalizer-->>Gateway: Canonical Question-to-Answer Entity Map
+    deactivate Normalizer
+    Gateway-->>Client: SSE Event: Multi-Page Collation Complete (Stage: normalizing, Progress: 60%)
 
-    par Parallel Evaluation per Question
-        API->>RAG: Retrieve Curriculum Context (Query + Subject + Class Level)
+    par Parallel Concurrent Evaluation per Question
+        Gateway->>RAG: Retrieve Curriculum Grounding (Subject + Academic Level Filter)
         activate RAG
-        RAG->>RAG: Check LRU Cache -> Generate Vector -> Filtered HNSW Search
-        RAG-->>API: Top-3 Authoritative Textbook Chunks + Similarity Scores
+        RAG->>RAG: Check In-Memory LRU Cache -> Generate Dense Embeddings
+        RAG->>RAG: Filtered HNSW Cosine Similarity Search in Vector DB
+        RAG-->>Gateway: Top-K Curriculum Chunks + Similarity Scores
         deactivate RAG
 
-        API->>Eval: Evaluate Answer against Textbook & Marking Rubric
+        Gateway->>Eval: Evaluate Answer against Textbook Grounding & Rubric
         activate Eval
-        alt Binary Question (MCQ / Fill-in-Blank / True-False)
-            Eval->>Eval: Enforce Strict Binary Score (0 or Max Score)
-        else Descriptive Question
-            Eval->>Eval: Score Factual (50%), Completeness (30%), Understanding (20%)
+        alt Objective Question (MCQ / True-False / Fill-in-Blank)
+            Eval->>Eval: Apply Strict Binary Gate: Score = Max Score iff Correct else 0
+        else Descriptive Question (Short/Long Answer / Derivation)
+            Eval->>Eval: Compute Weighted Breakdown: Factual (50%), Completeness (30%), Understanding (20%)
         end
-        Eval->>Eval: Generate Misconception Analysis & Remedial Guidance
-        Eval-->>API: QuestionEvaluationItem (Score + Breakdown + Diagnostics)
+        Eval->>Eval: Synthesize Diagnostic Misconceptions & Remedial Guidance
+        Eval-->>Gateway: Structured Question Evaluation Payload
         deactivate Eval
     end
 
-    API->>API: Aggregate Total Paper Metrics & Percentage
-    API->>DB: Persist Evaluation Record (saved_evaluations Table)
+    Gateway->>Gateway: Aggregate Total Paper Marks, Percentage & Performance Tier
+    Gateway->>DB: Persist Evaluation Entity (UUID, Scores, Breakdown, JSON Report)
     activate DB
-    DB-->>API: Confirmation (UUID Stored)
+    DB-->>Gateway: Confirmation Stored
     deactivate DB
 
-    API-->>User: SSE Event: Complete (100%) + Full Evaluation Payload
-    deactivate API
+    Gateway-->>Client: SSE Event: Pipeline Complete (Stage: completed, Progress: 100%) + Full Report
+    deactivate Gateway
 ```
 
 ---
 
-### Core System Functionality: Deep-Dive Technical Explanation
+### Exhaustive Architectural Specification & Component Deep-Dive
 
-#### 1. Universal Document Ingestion & Dual-Engine OCR Pipeline
-The ingestion tier is built to eliminate handwriting transcription errors and layout artifacts before semantic evaluation begins:
-* **Digital PDF Fast-Path**: Incoming PDFs are first analyzed via PyMuPDF (`fitz`). If valid digital text is present (>200 characters across pages), native text is directly extracted in less than 50ms, bypassing unnecessary visual OCR.
-* **Computer Vision Preprocessing Pipeline**: For scanned documents and mobile phone uploads, OpenCV applies an automated image enhancement chain:
-  1. *Dynamic Rescaling*: Normalized to an optimal width of 2,500px using bicubic/area interpolation.
-  2. *Fast Non-Local Means Denoising (`cv2.fastNlMeansDenoising`)*: Cleans background noise, paper texture, and bleed-through ink.
-  3. *Contrast Limited Adaptive Histogram Equalization (CLAHE)*: Balances light/faint pencil marks against dark pen strokes.
-  4. *Adaptive Gaussian Thresholding*: Separates handwriting strokes from ruled paper lines.
-  5. *In-Memory Hough Deskewing*: Calculates median line angles and rotates skew deviations between $\pm 0.5^\circ$ and $15^\circ$ directly in memory.
-* **Dual-Engine Resilient OCR**: Primary OCR is executed against Google Cloud Vision API `document_text_detection`. If quota or billing exceptions trigger, an automated circuit breaker switches instantaneously to **Google Gemini 1.5 Flash Multimodal Vision API**, guaranteeing zero pipeline interruption.
-* **Spatial Diagram Detection**: `DiagramService` runs parallel OpenCV contour analysis and Google Vision object localization to detect hand-drawn scientific diagrams, electrical circuits, and geometric shapes, mapping their bounding boxes directly to the relevant question numbers.
+#### 1. Presentation & Client Interface Tier
+The client layer is implemented as an enterprise-grade Single Page Application (SPA). To maintain clean modular decoupling, all presentation concerns are encapsulated within a unified boundary interacting with the backend exclusively via asynchronous HTTP/2 REST endpoints and Server-Sent Events (SSE):
+* **State Management & Live Telemetry**: As multi-question evaluation involves multiple concurrent pipeline stages (OCR, normalizer collation, targeted vector queries, LLM scoring), the frontend establishes an SSE event stream (`EventSource`). The backend streams granular progression updates (`init` $\to$ `ocr` $\to$ `normalizing` $\to$ `rag` $\to$ `evaluating` $\to$ `completed`) alongside percentage completion counters.
+* **Curriculum Vector Management Console**: Provides an administrative interface for subject matter experts to upload syllabus textbooks, trigger sentence-boundary chunking, view vector database statistics (collection points, dimension sizes), and inspect raw chunks stored in the vector database.
+* **Human-in-the-Loop Override Interface**: Enables educators to inspect the exact textbook chunks retrieved by the vector engine, read the model's error diagnosis, calibrate awarded marks, input audit remarks, and persist revised reports.
 
-#### 2. Semantic Answer Normalization & Multi-Page Collation
-In real-world examinations, students frequently write answers across multiple pages, split calculations across margins, or answer questions out of numerical sequence:
-* **The Normalization Engine (`AnswerNormalizer`)**: Utilizes a specialized LLM instruction prompt constrained to return strict JSON. It performs three critical operations:
-  1. *Transcription Cleaning*: Corrects OCR typos and repairs distorted scientific terms (e.g., repairing `solen0id` to `solenoid`, reconstructing missing exponents like $10^5$ from `10 5`).
-  2. *Cross-Page Collation*: Gathers and stitches scattered question fragments found on Page 1, Page 3, and margins into a unified, coherent answer string per question number.
-  3. *Unattempted Detection*: Explicitly identifies omitted questions, assigning them an unequivocal unattempted status (`[Not attempted by student in submitted sheet]`) to prevent spurious hallucinated scores.
-* **Heuristic Regex Fallback (`AnswerParser`)**: An enterprise-hardened parser supporting 15+ student answer header styles (`Q1.`, `Ans 2)`, `Section B - 3.`, pure MCQ letters `1. (B)`) operates as an offline fallback.
+#### 2. Asynchronous API Gateway & Routing Tier
+* **ASGI Runtime & Concurrency**: Powered by FastAPI and the Uvicorn ASGI engine on Python 3.11, employing non-blocking `async/await` patterns throughout the request lifecycle.
+* **Traffic Control & Resilience**:
+  * *Token-Bucket Rate Limiter*: Implemented via `slowapi` to protect expensive computer vision and foundation model endpoints from denial-of-service degradation.
+  * *Global Exception Boundary*: Catches uncaught runtime exceptions, formats structured JSON diagnostic responses, and enforces cross-origin resource sharing (CORS) headers across all response paths.
+  * *Multipart Processing*: Streams incoming multi-file uploads into in-memory temporary buffers, preventing disk bottlenecking during peak concurrency.
 
-#### 3. Curriculum-Grounded Vector Search (RAG) Architecture
-To completely eliminate LLM hallucination and ensure scoring conforms strictly to official course curricula:
-* **Textbook Chunking & Vectorization**: Reference textbooks (NCERT, CBSE, University modules) are ingested via PyMuPDF with sentence-boundary and punctuation awareness (800 characters with 150-character overlap).
-* **Dense Embedding Generation**: Generated using `sentence-transformers` (`all-MiniLM-L6-v2` / `all-mpnet-base-v2`) outputting 384-dimensional dense vectors.
-* **In-Memory LRU Caching**: An in-memory LRU cache stores up to 2,048 query vector embeddings and 512 context result payloads, delivering sub-millisecond retrieval on common queries.
-* **Qdrant Vector Database**: Vector search is executed with strict payload metadata filtering:
-  $$\text{Filter} = \{\text{subject} == \text{normalized\_subject}\} \land \{\text{class\_level} == \text{normalized\_class\_level}\}$$
-  This prevents curriculum leakage (e.g., ensuring a Class 10 Chemistry question is never scored against university-level organic reaction mechanics).
+#### 3. Multimodal Ingestion & Computer Vision Preprocessing Tier
+* **Digital PDF Direct Extraction Fast-Path**: Prior to invoking computationally intensive visual transformations, incoming PDF documents are inspected via PyMuPDF (`fitz`). If native digital character streams exist and exceed 200 characters across pages, text is extracted directly in under 50ms, bypassing visual OCR.
+* **Computer Vision Optimization Pipeline**:
+  1. *Spatial Rescaling*: Scanned images are normalized to a standard width of 2,500px using bicubic/area interpolation to establish an invariant pixel-density baseline.
+  2. *Fast Non-Local Means (NLM) Denoising*: Removes high-frequency scanner noise, paper grain, and ink bleed-through from the opposing page (`cv2.fastNlMeansDenoising`).
+  3. *Contrast-Limited Adaptive Histogram Equalization (CLAHE)*: Equalizes local tile contrast ($8\times 8$ grid, clip limit 2.5), enhancing faint pencil marks without blowing out saturated pen strokes.
+  4. *Adaptive Gaussian Thresholding*: Binarizes images using local pixel neighborhoods, separating handwriting from background paper texture.
+  5. *In-Memory Hough Deskewing*: Evaluates line orientation angles using the Hough transform. If page skew $|\theta|$ satisfies $0.5^\circ \le |\theta| \le 15^\circ$, an affine rotation matrix $M$ rotates the image buffer in memory.
+* **Dual-Engine OCR Circuit Breaker**:
+  * Primary transcription utilizes a Cloud Vision OCR service (`document_text_detection`).
+  * If quota limits, network timeouts, or billing exceptions are detected, the system circuit breaker activates, redirecting the request to a **Multimodal Foundation Model (Vision-Language Model)** that transcribes handwriting and mathematical equations verbatim.
+* **Spatial Diagram Detection**: `DiagramService` and `QuestionRegionDetector` execute OpenCV contour analysis and object localization in parallel, isolating geometric diagrams, electrical circuits, and graphs, mapping their bounding boxes to corresponding question numbers.
 
-#### 4. Multi-Provider Step-Wise Evaluation & Strict Scoring Enforcers
-Grading is executed via a dual-layer AI scoring architecture governed by deterministic constraints:
-* **Dynamic Persona & Rubric Adaptation**: The system adapts its evaluator demeanor based on the target academic system:
-  * *University / Engineering*: Rigorous mathematical derivations, step precision, and academic terminology.
-  * *Competitive Examinations*: High-precision analytical correctness and concise justifications.
-  * *K-12 School Boards*: Constructive step-marking rewarding conceptual understanding.
+#### 4. Semantic Normalization & Multi-Page Collation Agent Tier
+* **Transcription Sanitization**: The normalization agent uses a constrained foundation LLM instruction prompt to correct character ambiguities without altering student logic (e.g., repairing `solen0id` to `solenoid`, restoring distorted exponents such as $10^5$).
+* **Cross-Page Fragment Stitching**: In written examinations, students frequently write part of an answer on Page 1, continue calculations on Page 3, or write supplementary steps in the margins. The normalization agent traces and collates all scattered fragments into a single unified answer string per question.
+* **Deterministic Omission Flagging**: Questions left unanswered are assigned the canonical token `[Not attempted by student in submitted sheet]` and marked as unattempted, guaranteeing zero hallucinated partial credit.
+* **Heuristic Regex Parser Fallback**: An offline regex parser supporting 15+ numbering conventions (`Q1.`, `Ans 2)`, `1. (a)`, pure MCQ answer keys) operates as an immediate fallback if LLM normalization is unavailable.
+
+#### 5. Curriculum-Grounded Dense Vector Retrieval (RAG) Tier
+* **Semantic Punctuation-Aware Chunking**: Reference textbooks and official marking schemes are ingested with sentence-boundary and punctuation awareness (800 characters with 150-character overlap) to prevent truncated proofs or incomplete definitions.
+* **Dense Vector Embeddings**: Text chunks are mapped into high-dimensional vector space using a pre-trained sentence transformer model (`all-MiniLM-L6-v2` / `all-mpnet-base-v2`).
+* **Two-Tier In-Memory LRU Caching**:
+  * *Vector Cache (2,048 entries)*: Caches query embeddings, achieving 0ms latency on repeated queries.
+  * *Context Cache (512 entries)*: Caches retrieved context chunks for identical query tuples.
+* **Vector Database & HNSW Search**:
+  Vector similarity search is executed in the vector database using the Cosine distance metric over Hierarchical Navigable Small World (HNSW) graph indexes.
+* **Strict Payload Filtering**: To prevent syllabus mismatch, all vector queries apply strict metadata filters:
+  $$\text{Filter} = \{\text{subject} == \text{NormalizedSubject}\} \land \{\text{academic\_level} == \text{NormalizedLevel}\}$$
+  If the grade-specific partition contains no matching chunks, the engine gracefully broadens to subject-level context.
+
+#### 6. Multi-Criteria Step-Wise Evaluation & Scoring Tier
+* **Academic Persona Adaptation**: The grading agent dynamically tailors its evaluator persona based on the target academic system:
+  * *Higher Education / University*: Enforces university-level academic rigor, validating step derivations, mathematical precision, and professional terminology.
+  * *Competitive Examinations*: Prioritizes analytical correctness, concise justifications, and penalizes unsupported assumptions.
+  * *School Board Examinations*: Applies constructive step-marking according to standard board rubrics, rewarding conceptual clarity and valid intermediate steps.
 * **Strict Binary Scoring Enforcer (Objective Questions)**:
-  For questions classified as `MCQ`, `Assertion-Reasoning`, `True/False`, `Fill in the Blank`, or `Match the Following`, the engine enforces a strict binary rule:
+  For questions classified as `MCQ`, `Multiple Choice`, `Assertion-Reasoning`, `True/False`, `Fill in the Blank`, or `Match the Following`, the engine enforces strict binary logic:
   $$\text{Score} = \begin{cases} \text{Max Score}, & \text{if student choice matches rubric exactly} \\ 0, & \text{otherwise} \end{cases}$$
-  All confidence-based leniency boosts are completely bypassed, preventing partial credit on incorrect choices.
-* **Multi-Criteria Step-Wise Rubric Scoring (Descriptive Questions)**:
-  Descriptive answers are evaluated across three orthogonal dimensions:
-  1. *Factual Correctness (50% of weight)*: Accuracy of scientific laws, values, and definitions.
-  2. *Structural Completeness (30% of weight)*: Step-by-step logic, equations, derivations, and units.
-  3. *Conceptual Understanding (20% of weight)*: Application of principles and absence of flawed assumptions.
-* **Dual-Provider Resilience**: Primary evaluation runs on **DeepSeek-V3** via asynchronous streaming. If provider timeouts or connection limits occur, the request automatically falls back to **Google Gemini 1.5 Flash**, maintaining high availability.
+  All confidence-based leniency boosts are suppressed, preventing partial marks for incorrect choices.
+* **Multi-Criteria Step-Wise Rubric Scorer (Descriptive Questions)**:
+  Descriptive responses are evaluated across three orthogonal dimensions:
+  1. *Factual Correctness (50% Weight)*: Precision of stated scientific laws, numerical values, and core definitions.
+  2. *Structural Completeness (30% Weight)*: Presence of step derivations, formulas, intermediate workings, and SI units.
+  3. *Conceptual Understanding (20% Weight)*: Soundness of principle application and absence of flawed assumptions.
+* **Multi-Provider LLM Resilience**: Primary grading requests execute against a high-performance foundation LLM. If timeouts or connection exceptions occur, failover logic invokes a secondary foundation model, maintaining high availability.
 
-#### 5. Formative Pedagogical Diagnostics & Remediation
-Rather than returning raw numbers, the engine generates actionable educational intelligence:
-* **Misconception Diagnosis**: Pinpoints the exact conceptual misunderstanding, juxtaposing what the student claimed against the scientifically correct principle, accompanied by the deduction rationale.
-* **Missing Concepts**: Enumerates required terms, formulas, or diagram labels omitted by the student.
-* **Personalized Remedial Guidance**: Formulates actionable recommendations, specific textbook chapters to re-read, and targeted problem sets to practice.
+#### 7. Pedagogical Diagnostics & Remediation Tier
+* **Misconception Mapping**: Identifies the specific conceptual mistake, juxtaposing the student's assertion against the scientifically correct principle, accompanied by the deduction rationale.
+* **Curriculum Gap Analysis**: Isolates omitted terms, missing mathematical steps, or absent diagram labels.
+* **Remedial Guidance**: Formulates actionable recommendations, specific textbook chapters to re-read, and targeted problem sets to practice.
 
-#### 6. Persistence, Auditability & Examiner Override
-* **PostgreSQL Storage (`saved_evaluations`)**: Complete evaluation payloads—including raw student answer fragments, cleaned text, individual question scores, criteria breakdowns, and RAG traces—are persisted with unique UUIDs.
-* **Examiner Manual Overrides**: Provides a secure audit trail for teachers to inspect AI grading rationale, adjust scores per question with remarks, and store revised evaluations.
+#### 8. Relational Persistence & Audit Tier
+* **Relational Storage (RDBMS)**: Evaluation payloads—including raw student answer fragments, normalized text, question scores, criteria breakdowns, RAG retrieval traces, and diagnostic summaries—are stored in the `saved_evaluations` relational table with immutable UUID keys.
+* **Human-in-the-Loop Override Pipeline**: Provides an API endpoint allowing authorized teachers to inspect model grading, calibrate individual question marks, log rationale remarks, and update records.
 
 ---
 
-### Technical Specification Matrix
+### Quantitative Architectural Metrics & Specifications
 
-| Subsystem | Technology / Engine | Architectural Responsibility | Performance / Throughput SLA |
+| Layer / Subsystem | Architectural Implementation | Primary Function | Performance SLA / Latency |
 | :--- | :--- | :--- | :--- |
-| **Client Tier** | React 19 + MUI v9 + Vite | Single unified front-end interface, SSE real-time evaluation dashboard, history archive, textbook vector management | Bundle size: 682KB gzip; Initial load: <1.2s |
-| **API Gateway** | FastAPI + Uvicorn ASGI | Asynchronous routing, CORS policies, SlowAPI rate-limiting, error handling | Response latency: <5ms routing overhead |
-| **Preprocessing & Vision** | OpenCV 4.x + PyMuPDF | Image denoising, CLAHE equalization, deskewing, digital PDF bypass | Native PDF: <50ms; Scanned Image: 400-800ms |
-| **OCR Tier** | Google Cloud Vision API + Gemini Vision Fallback | Handwritten script transcription, formula detection, circuit breaker fallback | 1.2s - 2.8s per page |
-| **Collation Engine** | `AnswerNormalizer` (DeepSeek / Gemini) | OCR spell/equation correction, multi-page fragment collation, unattempted marking | 1.5s - 3.5s per submission |
-| **Vector Database** | Qdrant Vector Engine (Local / Remote) | HNSW indexed dense vector retrieval with subject and class-level payload filtering | <15ms retrieval latency |
-| **Embedding Model** | `all-MiniLM-L6-v2` / `all-mpnet-base-v2` | Dense sentence/paragraph vector embeddings (384d / 768d) | In-memory cache hit: 0ms; Cache miss: 25ms |
-| **Scoring Engine** | DeepSeek-V3 + Gemini 1.5 Flash | Parallel question evaluation, strict binary scoring enforcer, criteria breakdown | Full 30-question paper: 25s - 45s parallel |
-| **Persistence Tier** | PostgreSQL + SQLAlchemy ORM | Permanent storage of full evaluations, student snippets, audit logs, teacher overrides | Transaction latency: <8ms |
+| **Presentation Tier** | React 19 + MUI v9 + Vite SPA | Unified single-block client, live SSE dashboard, textbook & history consoles | Bundle size: 682KB gzip; Initial load: <1.2s |
+| **Gateway Tier** | FastAPI 2.0 + Uvicorn ASGI | Asynchronous routing, rate limiting, exception handling, CORS | Gateway routing overhead: <5ms |
+| **Document Preprocessing** | OpenCV 4.x + PyMuPDF | Image denoising, CLAHE equalization, deskewing, digital PDF bypass | Native PDF: <50ms; Scanned Image: 400-800ms |
+| **Vision OCR Tier** | Cloud Vision OCR + Fallback VLM | Handwritten script transcription, formula detection, circuit breaker fallback | 1.2s - 2.8s per page |
+| **Collation Agent** | Normalization Foundation LLM | OCR spelling repair, multi-page fragment collation, unattempted marking | 1.5s - 3.5s per paper |
+| **Vector DB (RAG)** | Vector Database (HNSW Cosine) | Curriculum-isolated textbook retrieval with subject/grade payload filters | Vector search latency: <15ms |
+| **Embedding Engine** | Dense Embedding Model (384d / 768d) | Dense vector representations of curriculum chunks and search queries | Cache hit: 0ms; Cache miss: 25ms |
+| **Evaluation Engine** | Dual Foundation LLMs (Primary + Fallback) | Parallel question evaluation, binary scoring enforcement, 3-tier criteria breakdown | Full 30-question paper: 25s - 45s parallel |
+| **Persistence Tier** | Relational RDBMS (PostgreSQL) | Permanent storage of full evaluations, student snippets, audit logs, teacher overrides | Transaction latency: <8ms |
 
 ---
 
-### Conclusion & Operational Readiness
-This architecture delivers an industry-grade, production-hardened evaluation pipeline that couples cutting-edge generative AI capabilities with deterministic mathematical constraints. By grounding all evaluations in isolated curriculum vectors and enforcing multi-tier fallback circuit breakers across both vision and LLM layers, the platform achieves zero-downtime reliability and uncompromised academic integrity.
+### Conclusion & Publication Readiness
+This architecture establishes an end-to-end, publication-grade blueprint for automated educational grading. By decoupling presentation concerns into a single interface block, deploying computer vision preprocessing alongside a resilient dual-engine OCR circuit breaker, grounding LLM inferences in isolated curriculum vectors, and strictly enforcing binary constraints on objective questions, the system achieves uncompromising academic integrity, high throughput, and zero-downtime reliability.
