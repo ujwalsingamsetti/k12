@@ -446,7 +446,8 @@ def build_docx_report():
 
     # --- TABLE OF CONTENTS (Pages vi - vii) ---
     add_centered_heading(doc, "TABLE OF CONTENTS")
-    t_toc1 = doc.add_table(rows=len(TOC_PAGE_1) + 1, cols=3)
+    all_toc = TOC_PAGE_1 + TOC_PAGE_2
+    t_toc1 = doc.add_table(rows=len(all_toc) + 1, cols=3)
     t_toc1.alignment = WD_TABLE_ALIGNMENT.CENTER
     set_table_borderless(t_toc1)
     t_toc1.rows[0].cells[0].paragraphs[0].add_run("CHAPTER NO.").font.bold = True
@@ -454,30 +455,8 @@ def build_docx_report():
     t_toc1.rows[0].cells[2].paragraphs[0].add_run("PAGE NO.").font.bold = True
     t_toc1.rows[0].cells[2].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
 
-    for r_idx, (ch_no, title, pg, is_bold) in enumerate(TOC_PAGE_1):
+    for r_idx, (ch_no, title, pg, is_bold) in enumerate(all_toc):
         r_cells = t_toc1.rows[r_idx + 1].cells
-        r_cells[0].text = ch_no
-        r_cells[1].text = title
-        r_cells[2].text = pg
-        r_cells[2].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
-        if is_bold:
-            for c in r_cells:
-                for run in c.paragraphs[0].runs:
-                    run.font.bold = True
-
-    doc.add_page_break()
-
-    add_centered_heading(doc, "TABLE OF CONTENTS (CONTINUED)")
-    t_toc2 = doc.add_table(rows=len(TOC_PAGE_2) + 1, cols=3)
-    t_toc2.alignment = WD_TABLE_ALIGNMENT.CENTER
-    set_table_borderless(t_toc2)
-    t_toc2.rows[0].cells[0].paragraphs[0].add_run("CHAPTER NO.").font.bold = True
-    t_toc2.rows[0].cells[1].paragraphs[0].add_run("TITLE").font.bold = True
-    t_toc2.rows[0].cells[2].paragraphs[0].add_run("PAGE NO.").font.bold = True
-    t_toc2.rows[0].cells[2].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
-
-    for r_idx, (ch_no, title, pg, is_bold) in enumerate(TOC_PAGE_2):
-        r_cells = t_toc2.rows[r_idx + 1].cells
         r_cells[0].text = ch_no
         r_cells[1].text = title
         r_cells[2].text = pg
@@ -633,8 +612,8 @@ def build_docx_report():
         for p in sec['paragraphs']:
             add_body_paragraph(doc, p)
 
-    # Table 3.3
-    add_academic_table(doc, "Table 3.3: Target Operational User Personas and Workflow Specifications",
+    # Table 3.1
+    add_academic_table(doc, "Table 3.1: Target Operational User Personas and Workflow Specifications",
                        ch1_3.TABLE_3_3_HEADERS, ch1_3.TABLE_3_3_DATA)
 
     for sec in ch1_3.CH3_SECTIONS_CONT:
@@ -642,8 +621,8 @@ def build_docx_report():
         for p in sec['paragraphs']:
             add_body_paragraph(doc, p)
 
-    # Table 3.1
-    add_academic_table(doc, "Table 3.1: Feasibility Study & Implementation Risk Assessment Matrix",
+    # Table 3.2
+    add_academic_table(doc, "Table 3.2: Feasibility Study & Implementation Risk Assessment Matrix",
                        ch1_3.TABLE_3_1_HEADERS, ch1_3.TABLE_3_1_DATA)
 
     for sec in ch1_3.CH3_SECTIONS_CONT2:
@@ -651,8 +630,8 @@ def build_docx_report():
         for p in sec['paragraphs']:
             add_body_paragraph(doc, p)
 
-    # Table 3.2
-    add_academic_table(doc, "Table 3.2: Hardware, Operating System, and Software Stack Specifications",
+    # Table 3.3
+    add_academic_table(doc, "Table 3.3: Hardware, Operating System, and Software Stack Specifications",
                        ch1_3.TABLE_3_2_HEADERS, ch1_3.TABLE_3_2_DATA)
 
     # Fig 3.1
@@ -704,34 +683,32 @@ def build_docx_report():
     add_academic_table(doc, "Table 4.1: PostgreSQL Relational Schema & Qdrant Payload Collections",
                        ch4_6.TABLE_4_1_HEADERS, ch4_6.TABLE_4_1_DATA)
 
-    # 4.5 Module 4 & Fig 4.3
+    # 4.5 Module 4
     add_section_heading(doc, ch4_6.CH4_SECTIONS_MOD4[0]['heading'])
     for p in ch4_6.CH4_SECTIONS_MOD4[0]['paragraphs']:
         add_body_paragraph(doc, p)
-    fig4_path = os.path.join(FIGURES_DIR, "fig4_dual_route_grading_rubric.png")
-    add_figure(doc, fig4_path, "Fig 4.3: Dual-Route Automated Grading Rubric & Decision Flow")
 
     # 4.5.1 & Table 4.2 & Algorithm 2
     add_subsection_heading(doc, ch4_6.CH4_SECTIONS_MOD4[1]['heading'])
     for p in ch4_6.CH4_SECTIONS_MOD4[1]['paragraphs']:
         add_body_paragraph(doc, p)
-    add_academic_table(doc, "Table 4.2: Few-Shot Prompt Templates & Multi-Attribute Scoring Parameters",
+    add_academic_table(doc, "Table 4.2: Structured JSON Schema & Prompt Template Specifications",
                        ch4_6.TABLE_4_2_HEADERS, ch4_6.TABLE_4_2_DATA)
     add_body_paragraph(doc, ch4_6.ALGORITHM_2_TEXT)
 
-    # 4.5.2 & Fig 4.4
+    # 4.5.2 & Fig 4.3
     add_subsection_heading(doc, ch4_6.CH4_SECTIONS_MOD4_GOV[0]['heading'])
     for p in ch4_6.CH4_SECTIONS_MOD4_GOV[0]['paragraphs']:
         add_body_paragraph(doc, p)
     fig6_path = os.path.join(FIGURES_DIR, "fig6_human_in_the_loop_governance.png")
-    add_figure(doc, fig6_path, "Fig 4.4: Human-in-the-Loop Governance & Teacher Verification Workflow")
+    add_figure(doc, fig6_path, "Fig 4.3: Teacher Evaluation Workbench & Audit Trail Architecture")
 
-    # 4.6 Module 5 & Fig 4.5
+    # 4.6 Module 5 & Fig 4.4
     add_section_heading(doc, ch4_6.CH4_SECTIONS_MOD5[0]['heading'])
     for p in ch4_6.CH4_SECTIONS_MOD5[0]['paragraphs']:
         add_body_paragraph(doc, p)
-    fig3_path = os.path.join(FIGURES_DIR, "fig3_vector_retrieval_rag_pipeline.png")
-    add_figure(doc, fig3_path, "Fig 4.5: Vector Retrieval & Curricular RAG Pipeline")
+    fig4_path = os.path.join(FIGURES_DIR, "fig4_dual_route_grading_rubric.png")
+    add_figure(doc, fig4_path, "Fig 4.4: Dual-Route Automated Grading Rubric & Decision Flow")
 
     # 4.6.1 & Table 4.3a & Algorithm 3
     add_subsection_heading(doc, ch4_6.CH4_SECTIONS_MOD5[1]['heading'])
@@ -741,7 +718,7 @@ def build_docx_report():
                        ch4_6.TABLE_4_3A_HEADERS, ch4_6.TABLE_4_3A_DATA)
     add_body_paragraph(doc, ch4_6.ALGORITHM_3_TEXT)
 
-    # 4.7 Module 6 & 4.7.1, 4.7.2
+    # 4.7 Module 6 & Fig 4.5
     for sec in ch4_6.CH4_SECTIONS_MOD6:
         if sec['level'] == 2:
             add_section_heading(doc, sec['heading'])
@@ -749,6 +726,8 @@ def build_docx_report():
             add_subsection_heading(doc, sec['heading'])
         for p in sec['paragraphs']:
             add_body_paragraph(doc, p)
+    fig3_path = os.path.join(FIGURES_DIR, "fig3_vector_retrieval_rag_pipeline.png")
+    add_figure(doc, fig3_path, "Fig 4.5: Vector Retrieval & Curricular RAG Pipeline")
 
     # 4.8 Module 7 & Fig 4.6
     add_section_heading(doc, ch4_6.CH4_SECTIONS_MOD7[0]['heading'])
