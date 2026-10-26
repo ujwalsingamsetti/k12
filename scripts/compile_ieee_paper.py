@@ -499,9 +499,9 @@ def build_pdf(output_filename="IEEE_K12_Automated_Grading_Research_Paper.pdf"):
         h2_style
     ))
     story.append(Paragraph(
-        "Let an examination question be formally represented as a tuple <i>Q</i> = ⟨<i>I</i><sub><i>q</i></sub>, <i>M</i><sub><i>q</i></sub>, "
-        "<i>R</i><sub><i>q</i></sub>, <i>K</i><sub><i>q</i></sub>, <i>s</i>, <i>c</i>⟩, where <i>I</i><sub><i>q</i></sub> is the unique "
-        "question identifier, <i>M</i><sub><i>q</i></sub> ∈ ℝ<sup>+</sup> denotes the maximum attainable marks, <i>R</i><sub><i>q</i></sub> "
+        "Let an examination question be formally represented as a tuple <i>Q</i> = (<i>I</i><sub><i>q</i></sub>, <i>M</i><sub><i>q</i></sub>, "
+        "<i>R</i><sub><i>q</i></sub>, <i>K</i><sub><i>q</i></sub>, <i>s</i>, <i>c</i>), where <i>I</i><sub><i>q</i></sub> is the unique "
+        "question identifier, <i>M</i><sub><i>q</i></sub> ∈ <b>R</b><sup>+</sup> denotes the maximum attainable marks, <i>R</i><sub><i>q</i></sub> "
         "is the authoritative scoring rubric, <i>K</i><sub><i>q</i></sub> = {<i>k</i><sub>1</sub>, <i>k</i><sub>2</sub>, ..., <i>k</i><sub><i>n</i></sub>} "
         "is the set of mandatory rubric keywords, <i>s</i> denotes the academic subject domain, and <i>c</i> represents the target grade level. "
         "A student examination submission comprises a set of multi-page handwritten image scans <i>P</i> = {<i>p</i><sub>1</sub>, <i>p</i><sub>2</sub>, ..., <i>p</i><sub><i>K</i></sub>}. "
@@ -518,7 +518,7 @@ def build_pdf(output_filename="IEEE_K12_Automated_Grading_Research_Paper.pdf"):
 
     # Equation 1
     eq1_table = Table([
-        [Paragraph("<i>F</i>(<i>P</i>, <i>Q</i>, <i>D</i><sub>curr</sub>) → ⟨<i>s</i><sub><i>q</i></sub>, <i>γ</i><sub><i>q</i></sub>, <i>E</i><sub><i>q</i></sub>⟩", eq_style),
+        [Paragraph("<i>F</i>(<i>P</i>, <i>Q</i>, <i>D</i><sub>curr</sub>) → (<i>s</i><sub><i>q</i></sub>, <i>γ</i><sub><i>q</i></sub>, <i>E</i><sub><i>q</i></sub>)", eq_style),
          Paragraph("(1)", eq_num_style)]
     ], colWidths=[col_w - 30, 30])
     eq1_table.setStyle(TableStyle([
@@ -531,7 +531,7 @@ def build_pdf(output_filename="IEEE_K12_Automated_Grading_Research_Paper.pdf"):
     story.append(eq1_table)
 
     story.append(Paragraph(
-        "Each diagnostic error triple <i>e</i><sub><i>j</i></sub> ∈ <i>E</i><sub><i>q</i></sub> is formally defined as <i>e</i><sub><i>j</i></sub> = ⟨<i>τ</i><sub><i>j</i></sub>, <i>ψ</i><sub><i>j</i></sub>, <i>δ</i><sub><i>j</i></sub>⟩, "
+        "Each diagnostic error triple <i>e</i><sub><i>j</i></sub> ∈ <i>E</i><sub><i>q</i></sub> is formally defined as <i>e</i><sub><i>j</i></sub> = (<i>τ</i><sub><i>j</i></sub>, <i>ψ</i><sub><i>j</i></sub>, <i>δ</i><sub><i>j</i></sub>), "
         "where <i>τ</i><sub><i>j</i></sub> ∈ {Conceptual, Procedural, Terminological} specifies the error taxonomy, <i>ψ</i><sub><i>j</i></sub> "
         "provides a clear pedagogical rationale, and <i>δ</i><sub><i>j</i></sub> &gt; 0 defines the exact partial credit deducted, satisfying:",
         body_style
@@ -733,7 +733,7 @@ def build_pdf(output_filename="IEEE_K12_Automated_Grading_Research_Paper.pdf"):
 
     # Equation 4
     eq4_table = Table([
-        [Paragraph("<i>s</i><sub>dense</sub>(<i>c</i><sub><i>i</i></sub>, <b>v</b><sub><i>q</i></sub>) = (<b>v</b><sub><i>q</i></sub> · <b>v</b><sub><i>c</i><sub><i>i</i></sub></sub>) / (‖<b>v</b><sub><i>q</i></sub>‖ · ‖<b>v</b><sub><i>c</i><sub><i>i</i></sub></sub>‖)", eq_style),
+        [Paragraph("<i>s</i><sub>dense</sub>(<i>c</i><sub><i>i</i></sub>, <b>v</b><sub><i>q</i></sub>) = (<b>v</b><sub><i>q</i></sub> · <b>v</b><sub><i>c</i><sub><i>i</i></sub></sub>) / (||<b>v</b><sub><i>q</i></sub>|| · ||<b>v</b><sub><i>c</i><sub><i>i</i></sub></sub>||)", eq_style),
          Paragraph("(4)", eq_num_style)]
     ], colWidths=[col_w - 30, 30])
     eq4_table.setStyle(TableStyle([
@@ -777,7 +777,7 @@ def build_pdf(output_filename="IEEE_K12_Automated_Grading_Research_Paper.pdf"):
 
     # Equation 5
     eq5_table = Table([
-        [Paragraph("<i>s</i><sub>keyword</sub>(<i>c</i><sub><i>i</i></sub>, <i>K</i><sub><i>q</i></sub>) = (1 / |<i>K</i><sub><i>q</i></sub>|) ∑<sub><i>p</i>=1</sub><sup>|<i>K</i><sub><i>q</i></sub>|</sup> 𝕀(<i>k</i><sub><i>p</i></sub> ∈ <i>c</i><sub><i>i</i></sub>)", eq_style),
+        [Paragraph("<i>s</i><sub>keyword</sub>(<i>c</i><sub><i>i</i></sub>, <i>K</i><sub><i>q</i></sub>) = (1 / |<i>K</i><sub><i>q</i></sub>|) ∑<sub><i>p</i>=1</sub><sup>|<i>K</i><sub><i>q</i></sub>|</sup> <b>1</b>(<i>k</i><sub><i>p</i></sub> ∈ <i>c</i><sub><i>i</i></sub>)", eq_style),
          Paragraph("(5)", eq_num_style)]
     ], colWidths=[col_w - 30, 30])
     eq5_table.setStyle(TableStyle([
@@ -790,7 +790,7 @@ def build_pdf(output_filename="IEEE_K12_Automated_Grading_Research_Paper.pdf"):
     story.append(eq5_table)
 
     story.append(Paragraph(
-        "where 𝕀(·) denotes the binary indicator function. The unified hybrid score <i>s</i><sub>hybrid</sub>(<i>c</i><sub><i>i</i></sub>) is formulated as:",
+        "where <b>1</b>(·) denotes the binary indicator function. The unified hybrid score <i>s</i><sub>hybrid</sub>(<i>c</i><sub><i>i</i></sub>) is formulated as:",
         body_style
     ))
 
@@ -827,7 +827,7 @@ def build_pdf(output_filename="IEEE_K12_Automated_Grading_Research_Paper.pdf"):
         Paragraph("5: &nbsp;&nbsp;&nbsp;&nbsp;Calculate cosine proximity <i>s</i><sub>dense</sub>(<i>c</i><sub><i>i</i></sub>, <b>v</b><sub><i>q</i></sub>) via Eq. (4)", algo_text_style),
         Paragraph("6: &nbsp;&nbsp;&nbsp;&nbsp;Calculate keyword coverage <i>s</i><sub>keyword</sub>(<i>c</i><sub><i>i</i></sub>, <i>K</i><sub><i>q</i></sub>) via Eq. (5)", algo_text_style),
         Paragraph("7: &nbsp;&nbsp;&nbsp;&nbsp;Compute unified score <i>s</i><sub>hybrid</sub>(<i>c</i><sub><i>i</i></sub>) = (1 − <i>α</i>) <i>s</i><sub>dense</sub> + <i>α</i> <i>s</i><sub>keyword</sub>", algo_text_style),
-        Paragraph("8: Filter Ω′ = {<i>c</i><sub><i>i</i></sub> ∈ Ω ∣ <i>s</i><sub>dense</sub>(<i>c</i><sub><i>i</i></sub>, <b>v</b><sub><i>q</i></sub>) ≥ <i>θ</i>}", algo_text_style),
+        Paragraph("8: Filter Ω′ = {<i>c</i><sub><i>i</i></sub> ∈ Ω | <i>s</i><sub>dense</sub>(<i>c</i><sub><i>i</i></sub>, <b>v</b><sub><i>q</i></sub>) ≥ <i>θ</i>}", algo_text_style),
         Paragraph("9: Rank Ω′ descending by <i>s</i><sub>hybrid</sub>; select top-<i>k</i> passages (<i>k</i>=3)", algo_text_style),
         Paragraph("10: <b>return</b> Curricular context <i>C</i><sub>grounded</sub>", algo_text_style),
     ]
